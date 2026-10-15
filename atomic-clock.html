@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Atomic Clock</title>
+<meta name="theme-color" content="#0b0f12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Atomic Clock">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0f12'/%3E%3Cpath d='M20 14h24M20 50h24M18 17v12M46 17v12M18 35v12M46 35v12' stroke='%23fff' stroke-width='6' stroke-linecap='square'/%3E%3C/svg%3E">
+<style>
+/* Layout: black LCD screen — day, date and time stacked dead-centre; sync status and controls pinned to the bottom */
+:root{
+  --bg:#0b0f12; --fg:#ffffff; --muted:#8d969b; --line:#2a3238; --ok:#2fd14f; --warn:#f0a43a;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  /* LCD unit: script sets this so the display fills the screen in either orientation */
+  --u:12vw;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--sans);
+  display:flex; flex-direction:column; text-align:center; overflow:hidden;
+  padding-block:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-tap-highlight-color:transparent;
+}
+main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(var(--u)*.28)}
+.row{display:flex; align-items:flex-end; justify-content:center; font-size:var(--u); line-height:1}
+.daydate{display:flex; flex-direction:column; align-items:center; gap:calc(var(--u)*.28); font-size:calc(var(--u)*.78)}
+.daydate .row{font-size:1em}
+/* Landscape: day and date share one line so the time can grow to fill the width */
+@media (orientation:landscape){
+  .daydate{flex-direction:row; gap:.7em; font-size:calc(var(--u)*.5)}
+  main{gap:calc(var(--u)*.22)}
+}
+/* LCD characters drawn in-page: 14-segment style, rounded bars, faint unlit segments; fixed widths so nothing shifts */
+.row svg{display:block; height:1em; width:.635em; margin:0 .05em; overflow:visible}
+.row svg.sep{width:.21em; margin:0}
+.row line{stroke:var(--fg); stroke-linecap:round}
+.row line.off{opacity:.06}
+.row circle{fill:var(--fg)}
+
+/* Which timezone the clock shows */
+.tz{font-family:var(--sans); font-weight:700; font-size:calc(var(--u)*.2); letter-spacing:.08em; color:var(--muted); white-space:nowrap}
+#place{font-size:clamp(.8rem,2.6vmin,1.05rem); color:var(--muted); min-height:1.3em; margin-top:calc(var(--u)*.1)}
+#place[hidden]{display:none}
+#place b{color:var(--fg); font-weight:600}
+
+footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:.8rem 1rem; text-align:left; font-size:.8rem; color:var(--muted)}
+.cam{width:100%; display:flex; justify-content:center; gap:.5rem}
+.cam select,.cam input{font:inherit; font-size:.95rem; color:var(--fg); background:var(--line); border:1px solid transparent; border-radius:8px; padding:.45rem .6rem; min-width:0}
+.cam input{width:8.5rem; text-transform:uppercase; letter-spacing:.06em}
+.cam input::placeholder{text-transform:none; letter-spacing:0; color:var(--muted)}
+.cam select:focus-visible,.cam input:focus-visible{outline:2px solid var(--fg); outline-offset:1px}
+/* Camera label shown on the clock face, so every sync photo says which camera it is */
+.camlabel{font-family:var(--sans); font-weight:900; font-size:calc(var(--u)*var(--labk,.68)); line-height:1; letter-spacing:.04em; white-space:nowrap;
+  background:var(--fg); color:var(--bg); padding:.14em .38em .12em; border-radius:.14em}
+.camlabel:empty{display:none}
+#status{display:flex; flex-direction:column; gap:.15rem; min-width:0}
+#syncText{color:var(--muted)}
+.ok #syncText{color:var(--ok)}
+.bad #syncText{color:var(--warn)}
+#detail{font-variant-numeric:tabular-nums}
+.controls{display:flex; align-items:center; gap:1.1rem; flex-shrink:0}
+.controls button{font:inherit; color:var(--fg); background:none; border:0; padding:.3rem 0; text-decoration:underline; text-underline-offset:3px; cursor:pointer}
+.switch{display:inline-flex; align-items:center; gap:.5rem; color:var(--fg); cursor:pointer; position:relative}
+.switch input{position:absolute; opacity:0; width:1px; height:1px}
+.switch .track{width:2.4rem; height:1.4rem; border-radius:999px; background:var(--line); position:relative; transition:background .15s}
+.switch .knob{position:absolute; top:.15rem; left:.15rem; width:1.1rem; height:1.1rem; border-radius:50%; background:var(--fg); transition:transform .15s}
+.switch input:checked + .track{background:var(--fg)}
+.switch input:checked + .track .knob{transform:translateX(1rem); background:var(--bg)}
+.controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
+/* Camera settings button + sheet */
+.setbtn b{font-weight:700; color:var(--warn)}
+.setbtn.done b{color:var(--ok)}
+.sheet{position:fixed; inset:0; z-index:10; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center}
+.sheet[hidden]{display:none}
+.sheet-panel{width:100%; max-width:34rem; max-height:88%; overflow:auto; background:#151b1f; color:var(--fg); border-radius:16px 16px 0 0;
+  padding-block:1rem max(1.2rem, env(safe-area-inset-bottom,0px));
+  padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px));
+  display:flex; flex-direction:column; gap:.9rem; text-align:left; font-size:.95rem}
+.sheet-head{display:flex; align-items:center; justify-content:space-between}
+.sheet-head h2{margin:0; font-size:1.1rem}
+.sheet-head button{font:inherit; font-weight:700; color:var(--bg); background:var(--fg); border:0; border-radius:999px; padding:.4rem 1rem; cursor:pointer}
+.pick{display:flex; gap:.5rem}
+.pick select{flex:1; min-width:0; font:inherit; color:var(--fg); background:var(--line); border:0; border-radius:8px; padding:.6rem .6rem}
+.recent{display:flex; flex-wrap:wrap; gap:.4rem}
+.recent:empty{display:none}
+.recent button{font:inherit; font-size:.82rem; color:var(--fg); background:transparent; border:1px solid #3a444b; border-radius:999px; padding:.3rem .75rem; cursor:pointer}
+.recent button.cur{background:var(--fg); color:var(--bg); border-color:var(--fg)}
+.checklist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.5rem}
+.checklist label{display:flex; gap:.75rem; align-items:flex-start; background:#1d252a; border-radius:10px; padding:.7rem .8rem; cursor:pointer}
+.checklist input{width:1.3rem; height:1.3rem; margin:.1rem 0 0; accent-color:var(--ok); flex-shrink:0}
+.checklist .t{display:block; font-weight:700}
+.checklist .d{display:block; color:#c9d1d5; font-size:.88rem; line-height:1.35; margin-top:.15rem}
+.checklist .d b{color:var(--fg)}
+.checklist input:checked ~ span .t{color:var(--ok)}
+.sheet-note{margin:0; font-size:.78rem; color:var(--muted); line-height:1.4}
+.sheet button:focus-visible,.sheet select:focus-visible,.checklist input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+@media (max-width:420px){ footer{flex-direction:column; align-items:center; text-align:center} #status{align-items:center} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<main aria-live="off">
+  <div id="camLabel" class="camlabel" aria-label="Camera"></div>
+  <div class="daydate">
+    <div class="row" id="dayRow" aria-label="Day"></div>
+    <div class="row" id="dateRow" aria-label="Date"></div>
+  </div>
+  <div class="row" id="timeRow" aria-label="Time"></div>
+  <div class="tz" id="tz"></div>
+  <div id="place"><b id="suburb">Finding you…</b> <span id="coords"></span></div>
+</main>
+
+<footer>
+  <div class="cam" aria-label="Camera label">
+    <input id="camInit" type="text" maxlength="6" placeholder="SG initials" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="SG initials">
+    <select id="camType" aria-label="Camera type">
+      <option value="HAND CAM">Hand cam</option>
+      <option value="LS">LS</option>
+    </select>
+    <select id="camNum" aria-label="Camera number">
+      <option>1</option><option>2</option><option>3</option><option>4</option>
+    </select>
+  </div>
+  <div id="status">
+    <span id="syncText">Syncing with time server…</span>
+    <span id="detail"></span>
+  </div>
+  <div class="controls">
+    <button id="setBtn" class="setbtn" type="button" aria-haspopup="dialog">Camera settings <b id="setCount"></b></button>
+    <button id="resync" type="button">Sync now</button>
+    <label class="switch" for="locToggle">
+      <span>Location</span>
+      <input id="locToggle" type="checkbox" role="switch" aria-controls="place" checked>
+      <span class="track" aria-hidden="true"><span class="knob"></span></span>
+    </label>
+  </div>
+</footer>
+
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Camera settings</h2>
+      <button id="sheetClose" type="button">Done</button>
+    </div>
+    <div class="pick">
+      <select id="brand" aria-label="Camera brand">
+        <option value="">Brand…</option><option>Sony</option><option>Canon</option><option>Nikon</option>
+      </select>
+      <select id="model" aria-label="Camera model" disabled><option value="">Model…</option></select>
+    </div>
+    <div id="recent" class="recent" aria-label="Recently used cameras"></div>
+    <ol id="checklist" class="checklist"></ol>
+    <p id="sheetNote" class="sheet-note"></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  function pad(n,w){ n=String(n); while(n.length<(w||2)) n="0"+n; return n; }
+
+  // ================= Time sync (NTP-style) =================
+  // Public HTTPS time services backed by atomic-clock-disciplined NTP servers.
+  var SOURCES = [
+    {name:"time.akamai.com", url:"https://time.akamai.com/?iso&ms", text:true,
+     parse:function(t){t=t.trim(); return /^\d+(\.\d+)?$/.test(t)?parseFloat(t)*1000:Date.parse(t);}},
+    {name:"timeapi.io", url:"https://timeapi.io/api/time/current/zone?timeZone=UTC",
+     parse:function(j){return Date.parse(j.dateTime.slice(0,23)+"Z");}},
+    {name:"worldtimeapi.org", url:"https://worldtimeapi.org/api/timezone/Etc/UTC",
+     parse:function(j){return Date.parse(j.utc_datetime);}}
+  ];
+  var offset = 0, synced = false, syncedAt = 0, source = "", accMs = 0;
+
+  function sample(src){
+    var t0 = performance.now(), w0 = Date.now();
+    return fetch(src.url + "&_=" + w0, {cache:"no-store"})
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return src.text ? r.text() : r.json(); })
+      .then(function(body){
+        var rtt = performance.now() - t0, server = src.parse(body);
+        if(!isFinite(server)) throw new Error("bad time");
+        return {offset: server - (w0 + rtt/2), rtt: rtt, name: src.name};
+      });
+  }
+  function syncFrom(i){
+    if(i >= SOURCES.length) return Promise.reject(new Error("all failed"));
+    var src = SOURCES[i];
+    // 3 samples; keep the one with the shortest round trip (most accurate)
+    return sample(src).then(function(a){
+      return sample(src).then(function(b){
+        return sample(src).then(function(c){ return [a,b,c].sort(function(x,y){return x.rtt-y.rtt;})[0]; },
+                                function(){ return a.rtt<b.rtt?a:b; });
+      }, function(){ return a; });
+    }).catch(function(){ return syncFrom(i+1); });
+  }
+  var statusEl = document.getElementById("status"), syncText = document.getElementById("syncText"), detail = document.getElementById("detail");
+  function sync(){
+    statusEl.className = ""; syncText.textContent = "Syncing with time server…";
+    syncFrom(0).then(function(best){
+      offset = best.offset; synced = true; syncedAt = Date.now(); source = best.name; accMs = Math.max(1, Math.round(best.rtt/2));
+      statusEl.className = "ok"; updateStatus();
+    }).catch(function(){
+      synced = false; offset = 0;
+      statusEl.className = "bad"; syncText.textContent = "Offline — showing phone clock (not synced)"; detail.textContent = "";
+    });
+  }
+  function updateStatus(){
+    if(!synced) return;
+    var mins = Math.floor((Date.now() - syncedAt)/60000);
+    syncText.textContent = (mins < 1 ? "Synced less than a minute ago" : "Synced " + mins + " min ago") + " · ±" + accMs + " ms";
+    var s = Math.abs(offset)/1000, sign = offset > 0 ? "−" : "+";
+    detail.textContent = source + " · phone clock " + (Math.abs(offset) < 5 ? "exact" : sign + s.toFixed(2) + " s");
+  }
+  document.getElementById("resync").addEventListener("click", sync);
+
+  // ================= LCD rendering =================
+  var dayRow = document.getElementById("dayRow"), dateRow = document.getElementById("dateRow"), timeRow = document.getElementById("timeRow");
+  var daydate = document.querySelector(".daydate"), mainEl = document.querySelector("main");
+
+  // ---- LCD segments: rounded bars with clear gaps; unlit segments stay faintly visible ----
+  var NS = "http://www.w3.org/2000/svg";
+  // 14-segment LCD in the style of the reference: rounded bars with clear gaps, faint unlit segments.
+  // Each segment is a straight line between two junction points, inset at both ends, drawn with round caps.
+  var LCD_W = 62, LCD_H = 100, LCD_T = 11, LCD_GAP = 2.6;
+  function lcdSegments(W, H, t, gap){
+    var xl = t/2, xr = W - t/2, xc = W/2, yt = t/2, ym = H/2, yb = H - t/2;
+    var J = { TL:[xl,yt], TR:[xr,yt], ML:[xl,ym], MR:[xr,ym], BL:[xl,yb], BR:[xr,yb], TC:[xc,yt], MC:[xc,ym], BC:[xc,yb] };
+    function seg(p, q){
+      var a = J[p], b = J[q], dx = b[0]-a[0], dy = b[1]-a[1], L = Math.hypot(dx,dy), ux = dx/L, uy = dy/L;
+      var inset = t/2 + gap;                        // round cap reaches t/2, then a visible gap
+      var r = function(v){ return Math.round(v*100)/100; };
+      return [r(a[0]+ux*inset), r(a[1]+uy*inset), r(b[0]-ux*inset), r(b[1]-uy*inset)];
+    }
+    return {
+      a:seg("TL","TR"), d:seg("BL","BR"), f:seg("TL","ML"), e:seg("ML","BL"), b:seg("TR","MR"), c:seg("MR","BR"),
+      g:seg("ML","MR"), g1:seg("ML","MC"), g2:seg("MC","MR"), i:seg("TC","MC"), l:seg("MC","BC"),
+      h:seg("TL","MC"), j:seg("TR","MC"), k:seg("BL","MC"), m:seg("BR","MC")
+    };
+  }
+  // Digits use the 7 classic segments; letters use the 14-segment set (split middle bar)
+  var DIGIT_SEGS = "a b c d e f g", LETTER_SEGS = "a b c d e f g1 g2 i l h j k m";
+  var LCD_MAP = {
+    "0":"a b c d e f", "1":"b c", "2":"a b g e d", "3":"a b g c d", "4":"f g b c", "5":"a f g c d",
+    "6":"a f g e d c", "7":"a b c", "8":"a b c d e f g", "9":"a b c d f g", "-":"g", " ":"",
+    A:"a b c e f g1 g2", B:"a b c d g2 i l", C:"a d e f", D:"a b c d i l", E:"a d e f g1", F:"a e f g1",
+    G:"a c d e f g2", H:"b c e f g1 g2", I:"i l", J:"b c d", K:"e f g1 j m", L:"d e f",
+    M:"b c e f h j", N:"b c e f h m", O:"a b c d e f", P:"a b e f g1 g2", Q:"a b c d e f m", R:"a b e f g1 g2 m",
+    S:"a c d f g1 g2", T:"a i l", U:"b c d e f", V:"e f k j", W:"b c e f k m", X:"h j k m", Y:"h j l", Z:"a d j k"
+  };
+  var SEGS = lcdSegments(LCD_W, LCD_H, LCD_T, LCD_GAP), MAP = LCD_MAP;
+  function charCell(letter){
+    var svg = document.createElementNS(NS,"svg");
+    svg.setAttribute("viewBox", "-2 -2 " + (LCD_W+4) + " " + (LCD_H+4));
+    var lines = {};
+    (letter ? LETTER_SEGS : DIGIT_SEGS).split(" ").forEach(function(k){
+      var p = SEGS[k], ln = document.createElementNS(NS,"line");
+      ln.setAttribute("x1",p[0]); ln.setAttribute("y1",p[1]); ln.setAttribute("x2",p[2]); ln.setAttribute("y2",p[3]);
+      ln.setAttribute("stroke-width", LCD_T); ln.setAttribute("class","off");
+      svg.appendChild(ln); lines[k] = ln;
+    });
+    var cur = null;
+    return {el:svg, set:function(ch){
+      if(ch===cur) return; cur=ch;
+      var on = " " + (MAP[ch]||"") + " ";
+      for(var k in lines) lines[k].setAttribute("class", on.indexOf(" "+k+" ")>-1 ? "" : "off");
+    }};
+  }
+  function sepCell(kind){
+    var svg = document.createElementNS(NS,"svg"); svg.setAttribute("viewBox","0 -2 22 104"); svg.setAttribute("class","sep");
+    (kind===":" ? [30,70] : [LCD_H - LCD_T/2]).forEach(function(y){
+      var c = document.createElementNS(NS,"circle"); c.setAttribute("cx",11); c.setAttribute("cy",y); c.setAttribute("r",LCD_T/2+0.8); svg.appendChild(c);
+    });
+    return svg;
+  }
+  // A row shows strings like "01:31:52.56"; the pattern fixes where separators sit
+  function makeRow(el, pattern, letters){
+    var cells = null, last = "";
+    function drawn(){
+      el.textContent = ""; el.className = "row drawn"; cells = [];
+      pattern.split("").forEach(function(ch){
+        if(ch === "#"){ var c = charCell(letters); el.appendChild(c.el); cells.push(c); }
+        else el.appendChild(sepCell(ch));
+      });
+      last = "";
+    }
+    function font(){ el.textContent = ""; el.className = "row txt"; cells = null; last = ""; }
+    function set(str){
+      if(str === last) return; last = str;
+      if(cells){ var digits = str.replace(/[:.]/g,""); for(var i=0;i<cells.length;i++) cells[i].set(digits.charAt(i)); }
+      else el.textContent = str;
+    }
+    drawn();
+    return {set:set, drawn:drawn, font:font};
+  }
+  var dayR  = makeRow(dayRow,  "###", true);
+  var dateR = makeRow(dateRow, "##.##.####");
+  var timeR = makeRow(timeRow, "##:##:##.##");
+  var tzEl = document.getElementById("tz");
+  function setDay(s){ dayR.set(s); } function setDate(s){ dateR.set(s); } function setTime(s){ timeR.set(s); }
+
+  // Scale everything so the display fills the screen (width or height, whichever runs out first)
+  function fit(){
+    var root = document.documentElement;
+    root.style.setProperty("--u","100px"); root.style.setProperty("--labk","1"); camLabelEl.style.fontSize = "";
+    // Label size is fixed: set by the longest possible label (6 initials + HAND CAM),
+    // so the white banner just hugs whatever text is shown
+    var probe = camLabelEl.cloneNode(false); probe.removeAttribute("id"); probe.setAttribute("aria-hidden","true");
+    probe.textContent = "WWWWWW · HAND CAM 4"; probe.style.cssText = "position:absolute;visibility:hidden;left:-9999px;font-size:100px";
+    document.body.appendChild(probe);
+    var tw = timeRow.scrollWidth, lw = probe.offsetWidth, lh = probe.offsetHeight;
+    probe.remove();
+    var w = Math.max(tw, daydate.scrollWidth);
+    // Never measure an empty display (that's what made it blow up on first open)
+    if(w < 200 || timeRow.offsetHeight < 50 || !mainEl.clientWidth || !lw){ root.style.setProperty("--u", fitted || "12vw"); return; }
+    var placeH = placeEl.hidden ? 0 : placeEl.offsetHeight;
+    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + 56 + (placeEl.hidden ? 0 : 28);
+    var availW = mainEl.clientWidth*0.94, availH = mainEl.clientHeight*0.92 - placeH;
+    var portrait = window.innerHeight >= window.innerWidth, scale;
+    if(portrait){
+      // Camera label scales with the clock; the longest label would be exactly as wide as the time
+      var k = tw / lw;
+      root.style.setProperty("--labk", k.toFixed(4));
+      scale = Math.min(availW / w, availH / (rest + lh*k + 28));
+    } else {
+      // Landscape: label keeps its phone-width (portrait) size and doesn't grow
+      var shortSide = Math.min(window.innerWidth, window.innerHeight);
+      var labelPx = Math.min(100, (shortSide - 32) * 0.94 * 100 / lw);
+      camLabelEl.style.fontSize = labelPx.toFixed(1) + "px";
+      var labelH = lh * labelPx / 100 + 28;
+      scale = Math.min(availW / w, (availH - labelH) / rest);
+    }
+    fitted = Math.max(10, Math.min(400, 100*scale)).toFixed(1) + "px";
+    root.style.setProperty("--u", fitted);
+  }
+  var fitted = "";
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", function(){ setTimeout(fit, 250); });
+
+  // e.g. "SYDNEY TIME · AEDT · UTC+11:00" — city from the phone's timezone setting
+  function tzLabel(d){
+    var city = "", abbr = "";
+    try{
+      var zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      city = zone.split("/").pop().replace(/_/g," ").toUpperCase();
+      var parts = new Intl.DateTimeFormat("en-AU",{timeZone:zone, timeZoneName:"short"}).formatToParts(d);
+      parts.forEach(function(p){ if(p.type === "timeZoneName") abbr = p.value; });
+      if(/^(GMT|UTC)/.test(abbr)) abbr = "";
+    }catch(e){}
+    var m = -d.getTimezoneOffset(), sign = m >= 0 ? "+" : "−"; m = Math.abs(m);
+    var off = "UTC" + sign + pad(Math.floor(m/60)) + ":" + pad(m%60);
+    return [city ? city + " TIME" : "LOCAL TIME", abbr, off].filter(Boolean).join(" · ");
+  }
+
+  // ================= Clock loop =================
+  var DAYS = ["SUN","MON","TUE","WED","THU","FRI","SAT"]; // always capitals
+  var lastDay = "", lastStatusMin = -1;
+  function tick(){ render(); requestAnimationFrame(tick); }
+  function render(){
+    var now = new Date(Date.now() + offset);
+    setTime(pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds()) + "." + pad(Math.floor(now.getMilliseconds()/10)));
+
+    var key = now.toDateString() + now.getTimezoneOffset();
+    if(key !== lastDay){
+      lastDay = key;
+      setDay(DAYS[now.getDay()]);
+      setDate(pad(now.getDate()) + "." + pad(now.getMonth()+1) + "." + now.getFullYear());
+      tzEl.textContent = tzLabel(now);
+    }
+    var m = now.getMinutes();
+    if(m !== lastStatusMin){ lastStatusMin = m; updateStatus(); }
+  }
+
+  // ================= Location =================
+  var placeEl = document.getElementById("place"), subEl = document.getElementById("suburb"), coEl = document.getElementById("coords");
+  var locBtn = document.getElementById("locToggle");
+  var watchId = null, lastGeo = null, showLoc = true;
+  try{ showLoc = localStorage.getItem("acLoc") !== "0"; }catch(e){}
+  function fmt(v,pos,neg){ return Math.abs(v).toFixed(4) + "°" + (v>=0?pos:neg); }
+
+  function reverse(lat, lon){
+    fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=en")
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var place = j.locality || j.city || "";
+        var region = [j.city && j.city !== place ? j.city : "", j.principalSubdivisionCode ? j.principalSubdivisionCode.split("-").pop() : j.principalSubdivision, j.countryCode].filter(Boolean).join(", ");
+        subEl.textContent = place ? place + (region ? ", " + region : "") : (region || "Unknown place");
+      })
+      .catch(function(){ subEl.textContent = "Place name unavailable"; });
+  }
+  function startGeo(){
+    if(watchId !== null) return;
+    if(!("geolocation" in navigator)){ subEl.textContent = "Location not supported"; coEl.textContent = ""; return; }
+    watchId = navigator.geolocation.watchPosition(function(p){
+      var c = p.coords;
+      coEl.textContent = "· " + fmt(c.latitude,"N","S") + " " + fmt(c.longitude,"E","W") + " · ±" + Math.round(c.accuracy) + " m";
+      if(!lastGeo || Math.hypot(c.latitude-lastGeo[0], c.longitude-lastGeo[1]) > 0.002){
+        lastGeo = [c.latitude, c.longitude];
+        reverse(c.latitude.toFixed(5), c.longitude.toFixed(5));
+      }
+    }, function(err){
+      subEl.textContent = err.code===1 ? "Location permission denied" : "Location unavailable";
+      coEl.textContent = err.code===1 ? "· allow it in browser settings" : "· check GPS is on";
+    }, {enableHighAccuracy:true, maximumAge:15000, timeout:30000});
+  }
+  // GPS is switched fully off while hidden, to save battery
+  function stopGeo(){ if(watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; }
+  function applyLoc(){ placeEl.hidden = !showLoc; locBtn.checked = showLoc; if(showLoc) startGeo(); else stopGeo(); fit(); }
+  locBtn.addEventListener("change", function(){
+    showLoc = locBtn.checked;
+    try{ localStorage.setItem("acLoc", showLoc ? "1" : "0"); }catch(e){}
+    applyLoc();
+  });
+
+  // ================= Camera label =================
+  var camLabelEl = document.getElementById("camLabel");
+  var camType = document.getElementById("camType"), camNum = document.getElementById("camNum"), camInit = document.getElementById("camInit");
+  try{
+    var saved = JSON.parse(localStorage.getItem("acCam") || "{}");
+    if(saved.t) camType.value = saved.t; if(saved.n) camNum.value = saved.n; if(saved.i) camInit.value = saved.i;
+  }catch(e){}
+  function updateCam(){
+    camInit.value = camInit.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
+    var parts = [];
+    if(camInit.value) parts.push(camInit.value);
+    parts.push(camType.value + " " + camNum.value);
+    camLabelEl.textContent = parts.join(" · ");
+    try{ localStorage.setItem("acCam", JSON.stringify({t:camType.value, n:camNum.value, i:camInit.value})); }catch(e){}
+    fit();
+  }
+  camType.addEventListener("change", updateCam); camNum.addEventListener("change", updateCam); camInit.addEventListener("input", updateCam);
+  // Done typing: drop the keyboard so the clock is fully visible again
+  camInit.addEventListener("keydown", function(e){ if(e.key === "Enter") camInit.blur(); });
+
+
+  // ================= Camera settings checklist =================
+  // Smallest JPEG size whose long edge is at least 4000 px, per body (3:2, full-frame / native image area).
+  // Sources: Sony Help Guides, Canon Europe spec pages, Nikon online manuals.
+  var CAMS = {
+    Sony: [
+      ["α1", "S", "4320×2880", "look1"], ["α1 II", "S", "4320×2880", "look"],
+      ["α9", "L", "6000×4000", "style"], ["α9 II", "L", "6000×4000", "style"], ["α9 III", "L", "6000×4000", "look"],
+      ["α7 III", "L", "6000×4000", "style"], ["α7 IV", "M", "4608×3072", "look"], ["α7 V", "M", "4608×3072", "look"],
+      ["α7R III / IIIA", "M", "5168×3448", "style"], ["α7R IV / IVA", "S", "4752×3168", "style"], ["α7R V", "S", "4752×3168", "look"],
+      ["α7S III", "L", "4240×2832", "look"],
+      ["α7C", "L", "6000×4000", "style"], ["α7C II", "M", "4608×3072", "look"], ["α7CR", "S", "4752×3168", "look"],
+      ["α6400", "M", "4240×2832", "style"], ["α6600", "M", "4240×2832", "style"], ["α6700", "M", "4384×2920", "look"]
+    ],
+    Canon: [
+      ["EOS R1", "L", "6000×4000"], ["EOS R3", "L", "6000×4000"],
+      ["EOS R5", "S1", "4176×2784"], ["EOS R5 Mark II", "S1", "4176×2784"],
+      ["EOS R6", "L", "5472×3648"], ["EOS R6 Mark II", "L", "6000×4000"], ["EOS R6 Mark III", "M", "4800×3200"], ["EOS R6 V", "M", "4800×3200"],
+      ["EOS R8", "L", "6000×4000"], ["EOS R8 Mark II", "L", "6000×4000"],
+      ["EOS R7", "M", "4800×3200"], ["EOS R10", "L", "6000×4000"],
+      ["EOS R", "M", "4464×2976"], ["EOS RP", "M", "4160×2768"],
+      ["EOS-1D X Mark II", "M1", "4368×2912"], ["EOS-1D X Mark III", "M1", "4368×2912"],
+      ["EOS 5D Mark IV", "M", "4464×2976"], ["EOS 6D Mark II", "M", "4160×2768"],
+      ["EOS 90D", "M", "4800×3200"], ["EOS 80D", "L", "6000×4000"], ["EOS M6 Mark II", "M", "4800×3200"]
+    ],
+    Nikon: [
+      ["Z9", "Small", "4128×2752", "FX"], ["Z8", "Small", "4128×2752", "FX"],
+      ["Z7 / Z7II", "Small", "4128×2752", "FX"], ["Z6 / Z6II", "Medium", "4528×3016", "FX"],
+      ["Z6III", "Medium", "≈4528×3024", "FX"], ["Zf", "Medium", "≈4528×3024", "FX"],
+      ["Z5", "Medium", "4512×3008", "FX"], ["Z5II", "Medium", "≈4528×3024", "FX"],
+      ["Z50 / Z50II", "Medium", "4176×2784", "DX"], ["Z fc", "Medium", "4176×2784", "DX"],
+      ["D6", "Medium", "4176×2784", "FX"], ["D5", "Medium", "4176×2784", "FX"],
+      ["D850", "Small", "4128×2752", "FX"], ["D780", "Medium", "4528×3016", "FX"],
+      ["D500", "Medium", "4176×2784", "DX"], ["D7500", "Medium", "4176×2784", "DX"]
+    ]
+  };
+  function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
+
+  // The four checks, worded the way each brand's menu words them
+  function checks(b, c){
+    var size = c[1], px = c[2];
+    if(b === "Sony") return [
+      ["White balance", "<b>AWB</b>, Priority Set in AWB → <b>Standard</b>"],
+      [c[3] === "style" ? "Creative Style" : "Creative Look",
+        c[3] === "style" ? "<b>Neutral (NT)</b>" :
+        c[3] === "look1" ? "<b>NT (Neutral)</b> · on firmware before 2.0: Creative Style → Neutral" : "<b>NT (Neutral)</b>"],
+      ["JPEG quality", "File format <b>JPEG</b> only (RAW off), JPEG Quality <b>Standard</b>"],
+      ["Image size", "JPEG Image Size <b>" + size + "</b> · " + px + " px · full-frame shooting"]
+    ];
+    if(b === "Canon") return [
+      ["White balance", "<b>AWB</b> — regular Auto (Ambience priority), not AWB W"],
+      ["Picture Style", "<b>Neutral (N)</b>"],
+      ["JPEG quality", "JPEG only (RAW off) with the <b>staircase</b> icon. If there's a JPEG quality 1–10 setting: <b>6</b>, the first staircase step down from 10"],
+      ["Image size", "Image quality <b>" + size + "</b> (staircase) · " + px + " px"]
+    ];
+    return [
+      ["White balance", "<b>AUTO1</b> — Auto, Normal"],
+      ["Picture Control", "<b>Neutral (NL)</b>"],
+      ["JPEG quality", "Image quality <b>JPEG normal</b> (no RAW)"],
+      ["Image size", "Image area <b>" + c[3] + "</b>, Image size <b>" + size + "</b> · " + px + " px"]
+    ];
+  }
+
+  var sheet = document.getElementById("sheet"), setBtn = document.getElementById("setBtn"), setCount = document.getElementById("setCount");
+  var brandSel = document.getElementById("brand"), modelSel = document.getElementById("model");
+  var recentEl = document.getElementById("recent"), listEl = document.getElementById("checklist"), noteEl = document.getElementById("sheetNote");
+  var cur = {b:"", m:""}, recent = [], ticks = {sig:"", v:[]};
+  try{
+    var sv = JSON.parse(localStorage.getItem("acModel") || "{}"); if(sv.b && findCam(sv.b, sv.m)) cur = {b:sv.b, m:sv.m};
+    recent = JSON.parse(localStorage.getItem("acRecent") || "[]").filter(function(r){ return findCam(r.b, r.m); });
+    ticks = JSON.parse(localStorage.getItem("acTicks") || '{"sig":"","v":[]}');
+  }catch(e){}
+  function save(){
+    try{
+      localStorage.setItem("acModel", JSON.stringify(cur));
+      localStorage.setItem("acRecent", JSON.stringify(recent));
+      localStorage.setItem("acTicks", JSON.stringify(ticks));
+    }catch(e){}
+  }
+  // The checklist belongs to one camera: brand, model, type and number. Any change starts it fresh.
+  function camSig(){ return [cur.b, cur.m, camType.value, camNum.value].join("|"); }
+  function syncTicks(){ var sig = camSig(); if(ticks.sig !== sig) ticks = {sig:sig, v:[false,false,false,false]}; }
+
+  function fillModels(){
+    modelSel.textContent = "";
+    var first = document.createElement("option"); first.value = ""; first.textContent = "Model…"; modelSel.appendChild(first);
+    (CAMS[cur.b] || []).forEach(function(c){ var o = document.createElement("option"); o.textContent = c[0]; modelSel.appendChild(o); });
+    modelSel.disabled = !cur.b; modelSel.value = cur.m || "";
+  }
+  function renderRecent(){
+    recentEl.textContent = "";
+    recent.forEach(function(r){
+      var bt = document.createElement("button"); bt.type = "button"; bt.textContent = r.b + " " + r.m;
+      if(r.b === cur.b && r.m === cur.m) bt.className = "cur";
+      bt.addEventListener("click", function(){ choose(r.b, r.m); });
+      recentEl.appendChild(bt);
+    });
+  }
+  function renderList(){
+    listEl.textContent = "";
+    var c = findCam(cur.b, cur.m);
+    if(!c){ noteEl.textContent = "Choose the camera brand and model to see its exact menu settings."; updateCount(); return; }
+    syncTicks();
+    checks(cur.b, c).forEach(function(item, i){
+      var li = document.createElement("li"), lb = document.createElement("label"), cb = document.createElement("input"), sp = document.createElement("span");
+      cb.type = "checkbox"; cb.id = "chk" + i; cb.checked = !!ticks.v[i];
+      cb.addEventListener("change", function(){ ticks.v[i] = cb.checked; save(); updateCount(); });
+      sp.innerHTML = '<span class="t"></span><span class="d">' + item[1] + "</span>";
+      sp.firstChild.textContent = item[0];
+      lb.appendChild(cb); lb.appendChild(sp); li.appendChild(lb); listEl.appendChild(li);
+    });
+    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Ticks reset when the camera, type or number changes.";
+    updateCount();
+  }
+  function updateCount(){
+    var c = findCam(cur.b, cur.m);
+    if(!c){ setCount.textContent = ""; setBtn.classList.remove("done"); return; }
+    syncTicks();
+    var n = ticks.v.filter(Boolean).length;
+    setCount.textContent = n + "/4"; setBtn.classList.toggle("done", n === 4);
+  }
+  function choose(b, m){
+    cur = {b:b, m:m};
+    if(b && m && findCam(b, m)){
+      recent = [{b:b, m:m}].concat(recent.filter(function(r){ return !(r.b === b && r.m === m); })).slice(0, 6);
+    }
+    brandSel.value = b; fillModels(); renderRecent(); renderList(); save();
+  }
+  brandSel.addEventListener("change", function(){ choose(brandSel.value, ""); });
+  modelSel.addEventListener("change", function(){ choose(cur.b, modelSel.value); });
+  function openSheet(){ sheet.hidden = false; document.getElementById("sheetClose").focus(); }
+  function closeSheet(){ sheet.hidden = true; setBtn.focus(); }
+  setBtn.addEventListener("click", openSheet);
+  document.getElementById("sheetClose").addEventListener("click", closeSheet);
+  sheet.addEventListener("click", function(e){ if(e.target === sheet) closeSheet(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !sheet.hidden) closeSheet(); });
+  // Changing camera type or number also starts a fresh checklist
+  camType.addEventListener("change", function(){ renderList(); save(); });
+  camNum.addEventListener("change", function(){ renderList(); save(); });
+  brandSel.value = cur.b; fillModels(); renderRecent(); renderList();
+
+  // ================= Keep screen awake =================
+  function wake(){ if(navigator.wakeLock && document.visibilityState==="visible") navigator.wakeLock.request("screen").catch(function(){}); }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible"){ wake(); sync(); } });
+
+  setInterval(sync, 10*60*1000);
+  render(); updateCam(); applyLoc(); sync(); wake(); tick();
+  window.addEventListener("load", fit); setTimeout(fit, 1000);
+})();
+</script>
+</body>
+</html>
