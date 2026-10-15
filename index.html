@@ -560,6 +560,39 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   };
   function yearOf(m){ return YEARS[m] || ""; }
   function newest(a, b){ return (parseInt(yearOf(b[0]).slice(-4),10) || 0) - (parseInt(yearOf(a[0]).slice(-4),10) || 0); }
+
+  // Model list layout per brand: groups by body type, flagship first
+  var GROUPS = {
+    Sony: [
+      ["Full frame mirrorless", ["α1 II", "α1", "α9 III", "α9 II", "α9", "α7R V", "α7R IV / IVA", "α7R III / IIIA", "α7R II", "α7R",
+        "α7S III", "α7S II", "α7S", "α7 V", "α7 IV", "α7 III", "α7 II", "α7", "α7CR", "α7C II", "α7C", "ZV-E1"]],
+      ["Full frame A-mount", ["α99 II"]],
+      ["APS-C mirrorless", ["α6700 (APS-C)", "α6600 (APS-C)", "α6500 (APS-C)", "α6400 (APS-C)", "α6300 (APS-C)", "α6100 (APS-C)", "ZV-E10 II (APS-C)", "ZV-E10 (APS-C)"]],
+      ["Compact · 1-inch", ["RX100 VA / VI / VII", "RX100 III / IV / V", "RX100 / RX100 II"]]
+    ],
+    Canon: [
+      ["Mirrorless · full frame", ["EOS R1", "EOS R3", "EOS R5 Mark II", "EOS R5", "EOS R6 Mark III", "EOS R6 V", "EOS R6 Mark II", "EOS R6", "EOS R", "EOS R8 Mark II", "EOS R8", "EOS RP"]],
+      ["Mirrorless · APS-C", ["EOS R7 (APS-C)", "EOS R10 (APS-C)", "EOS R50 (APS-C)", "EOS R100 (APS-C)", "EOS M6 Mark II (APS-C)", "EOS M5 (APS-C)", "EOS M6 (APS-C)", "EOS M50 / M50 Mark II (APS-C)"]],
+      ["DSLR · full frame", ["EOS-1D X Mark III", "EOS-1D X Mark II", "EOS 5DS / 5DS R", "EOS 5D Mark IV", "EOS 6D Mark II"]],
+      ["DSLR · APS-C", ["EOS 90D (APS-C)", "EOS 80D (APS-C)", "EOS 60D (APS-C)", "EOS 77D (APS-C)", "EOS 850D / T8i (APS-C)", "EOS 800D / T7i (APS-C)",
+        "EOS 760D / T6s (APS-C)", "EOS 750D / T6i (APS-C)", "EOS 250D / SL3 (APS-C)", "EOS 200D / SL2 (APS-C)"]]
+    ],
+    Fujifilm: [
+      ["X-H · flagship", ["X-H2S", "X-H2", "X-H1"]],
+      ["X-T · pro", ["X-T5", "X-T4", "X-T3", "X-T2"]],
+      ["X-Pro · rangefinder style", ["X-Pro3", "X-Pro2"]],
+      ["X-S · compact pro", ["X-S20", "X-S10"]],
+      ["X-T50 / X-T30 · mid", ["X-T50", "X-T30 III", "X-T30 II", "X-T30", "X-T20", "X-T10"]],
+      ["X-E / X-M · compact", ["X-E5", "X-E4", "X-E3", "X-M5"]]
+    ],
+    Nikon: [
+      ["Z mirrorless · full frame", ["Z9", "Z8", "Z7 / Z7II", "Z6III", "Z6 / Z6II", "Zf", "Z5II", "Z5"]],
+      ["Z mirrorless · APS-C (DX)", ["Z50 / Z50II (APS-C)", "Z fc (APS-C)", "Z30 (APS-C)"]],
+      ["DSLR · full frame", ["D6", "D5", "D4S", "D850", "D810", "D780", "D750", "Df", "D610"]],
+      ["DSLR · APS-C (DX)", ["D500 (APS-C)", "D7500 (APS-C)", "D7200 (APS-C)", "D5600 (APS-C)", "D5500 (APS-C)", "D3500 (APS-C)", "D3400 (APS-C)"]]
+    ]
+  };
+  function shortName(m){ return m.replace(" (APS-C)", ""); }
   function has(list, m){ return list.indexOf(m) > -1; }
   function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
 
@@ -618,15 +651,24 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   function fillModels(){
     modelSel.textContent = "";
     var first = document.createElement("option"); first.value = ""; first.textContent = "Model…"; modelSel.appendChild(first);
-    (CAMS[cur.b] || []).slice().sort(newest).forEach(function(c){
-      var o = document.createElement("option"); o.value = c[0]; o.textContent = c[0] + (yearOf(c[0]) ? "  ·  " + yearOf(c[0]) : ""); modelSel.appendChild(o);
-    });
+    if(GROUPS[cur.b]){
+      // Grouped list: body type headings, flagship first, short names only
+      GROUPS[cur.b].forEach(function(g){
+        var og = document.createElement("optgroup"); og.label = g[0];
+        g[1].forEach(function(m){ if(!findCam(cur.b, m)) return; var o = document.createElement("option"); o.value = m; o.textContent = shortName(m); og.appendChild(o); });
+        modelSel.appendChild(og);
+      });
+    } else {
+      (CAMS[cur.b] || []).slice().sort(newest).forEach(function(c){
+        var o = document.createElement("option"); o.value = c[0]; o.textContent = c[0] + (yearOf(c[0]) ? "  ·  " + yearOf(c[0]) : ""); modelSel.appendChild(o);
+      });
+    }
     modelSel.disabled = !cur.b; modelSel.value = cur.m || "";
   }
   function renderRecent(){
     recentEl.textContent = "";
     recent.forEach(function(r){
-      var bt = document.createElement("button"); bt.type = "button"; bt.textContent = r.b + " " + r.m;
+      var bt = document.createElement("button"); bt.type = "button"; bt.textContent = r.b + " " + shortName(r.m);
       if(r.b === cur.b && r.m === cur.m) bt.className = "cur";
       bt.addEventListener("click", function(){ choose(r.b, r.m); });
       recentEl.appendChild(bt);
