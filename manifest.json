@@ -1,7 +1,7 @@
 {
   "name": "SG-Atom-Uhr",
-  "short_name": "Atom-Uhr",
-  "description": "Sydney Time Atomic Clock Web Application",
+  "short_name": "SG-Atom-Uhr by RYS",
+  "description": "Atomic Clock Web Application",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait-primary",
