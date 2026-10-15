@@ -1,9 +1,6 @@
 <!doctype html>
 <html lang="en">
 <head>
- <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#000000">
-</head> 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Atomic Clock</title>
@@ -12,12 +9,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Atomic Clock">
+<link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
 /* Layout: black LCD screen — day, date and time stacked dead-centre; sync status and controls pinned to the bottom */
 :root{
-  --bg:#0b0f12; --fg:#ffffff; --muted:#8d969b; --line:#2a3238; --ok:#2fd14f; --warn:#f0a43a;
+  --bg:#0b0f12; --fg:#ffffff; --muted:#8d969b; --line:#2a3238; --ok:#2fd14f; --warn:#f0a43a; --bad:#e5383b;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   /* LCD unit: script sets this so the display fills the screen in either orientation */
   --u:12vw;
@@ -79,8 +77,14 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .switch input:checked + .track .knob{transform:translateX(1rem); background:var(--bg)}
 .controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
 /* Camera settings button + sheet */
-.setbtn b{font-weight:700; color:var(--warn)}
-.setbtn.done b{color:var(--ok)}
+/* Camera settings: a full-width button with the tick count; red until all four are done */
+.setbtn{width:100%; display:flex; align-items:center; justify-content:center; gap:.6rem;
+  font:inherit; font-size:1.15rem; font-weight:800; letter-spacing:.02em; color:var(--fg);
+  background:transparent; border:2px solid var(--bad); border-radius:12px; padding:.7rem 1rem; cursor:pointer}
+.setbtn b{font-size:1.25rem; font-weight:900; color:#fff; background:var(--bad); border-radius:999px; padding:.05rem .65rem; font-variant-numeric:tabular-nums}
+.setbtn.done{border-color:var(--ok)}
+.setbtn.done b{background:var(--ok); color:#06210e}
+.setbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .sheet{position:fixed; inset:0; z-index:10; background:rgba(0,0,0,.6); display:flex; align-items:flex-end; justify-content:center}
 .sheet[hidden]{display:none}
 .sheet-panel{width:100%; max-width:34rem; max-height:88%; overflow:auto; background:#151b1f; color:var(--fg); border-radius:16px 16px 0 0;
@@ -123,6 +127,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 </main>
 
 <footer>
+  <button id="setBtn" class="setbtn" type="button" aria-haspopup="dialog">Camera settings <b id="setCount">0/4</b></button>
   <div class="cam" aria-label="Camera label">
     <input id="camInit" type="text" maxlength="6" placeholder="SG initials" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="SG initials">
     <select id="camType" aria-label="Camera type">
@@ -138,7 +143,6 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     <span id="detail"></span>
   </div>
   <div class="controls">
-    <button id="setBtn" class="setbtn" type="button" aria-haspopup="dialog">Camera settings <b id="setCount"></b></button>
     <button id="resync" type="button">Sync now</button>
     <label class="switch" for="locToggle">
       <span>Location</span>
@@ -156,7 +160,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     </div>
     <div class="pick">
       <select id="brand" aria-label="Camera brand">
-        <option value="">Brand…</option><option>Sony</option><option>Canon</option><option>Nikon</option>
+        <option value="">Brand…</option><option>Canon</option><option>Fujifilm</option><option>Nikon</option><option>Sony</option>
       </select>
       <select id="model" aria-label="Camera model" disabled><option value="">Model…</option></select>
     </div>
@@ -450,31 +454,50 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["α1", "S", "4320×2880", "look1"], ["α1 II", "S", "4320×2880", "look"],
       ["α9", "L", "6000×4000", "style"], ["α9 II", "L", "6000×4000", "style"], ["α9 III", "L", "6000×4000", "look"],
       ["α7 III", "L", "6000×4000", "style"], ["α7 IV", "M", "4608×3072", "look"], ["α7 V", "M", "4608×3072", "look"],
-      ["α7R III / IIIA", "M", "5168×3448", "style"], ["α7R IV / IVA", "S", "4752×3168", "style"], ["α7R V", "S", "4752×3168", "look"],
-      ["α7S III", "L", "4240×2832", "look"],
+      ["α7R II", "M", "5168×3448", "style"], ["α7R III / IIIA", "M", "5168×3448", "style"],
+      ["α7R IV / IVA", "S", "4752×3168", "style"], ["α7R V", "S", "4752×3168", "look"],
+      ["α7S II", "L", "4240×2832", "style"], ["α7S III", "L", "4240×2832", "look"],
       ["α7C", "L", "6000×4000", "style"], ["α7C II", "M", "4608×3072", "look"], ["α7CR", "S", "4752×3168", "look"],
-      ["α6400", "M", "4240×2832", "style"], ["α6600", "M", "4240×2832", "style"], ["α6700", "M", "4384×2920", "look"]
+      ["ZV-E1", "L", "4240×2832", "look"],
+      ["α6100 (APS-C)", "M", "4240×2832", "style"], ["α6300 (APS-C)", "M", "4240×2832", "style"], ["α6400 (APS-C)", "M", "4240×2832", "style"],
+      ["α6500 (APS-C)", "M", "4240×2832", "style"], ["α6600 (APS-C)", "M", "4240×2832", "style"], ["α6700 (APS-C)", "M", "4384×2920", "look"],
+      ["ZV-E10 (APS-C)", "M", "4240×2832", "style"], ["ZV-E10 II (APS-C)", "M", "4384×2920", "look"]
     ],
     Canon: [
       ["EOS R1", "L", "6000×4000"], ["EOS R3", "L", "6000×4000"],
       ["EOS R5", "S1", "4176×2784"], ["EOS R5 Mark II", "S1", "4176×2784"],
       ["EOS R6", "L", "5472×3648"], ["EOS R6 Mark II", "L", "6000×4000"], ["EOS R6 Mark III", "M", "4800×3200"], ["EOS R6 V", "M", "4800×3200"],
       ["EOS R8", "L", "6000×4000"], ["EOS R8 Mark II", "L", "6000×4000"],
-      ["EOS R7", "M", "4800×3200"], ["EOS R10", "L", "6000×4000"],
       ["EOS R", "M", "4464×2976"], ["EOS RP", "M", "4160×2768"],
       ["EOS-1D X Mark II", "M1", "4368×2912"], ["EOS-1D X Mark III", "M1", "4368×2912"],
-      ["EOS 5D Mark IV", "M", "4464×2976"], ["EOS 6D Mark II", "M", "4160×2768"],
-      ["EOS 90D", "M", "4800×3200"], ["EOS 80D", "L", "6000×4000"], ["EOS M6 Mark II", "M", "4800×3200"]
+      ["EOS 5DS / 5DS R", "S1", "4320×2880"], ["EOS 5D Mark IV", "M", "4464×2976"], ["EOS 6D Mark II", "M", "4160×2768"],
+      ["EOS R7 (APS-C)", "M", "4800×3200"], ["EOS R10 (APS-C)", "L", "6000×4000"], ["EOS R50 (APS-C)", "L", "6000×4000"], ["EOS R100 (APS-C)", "L", "6000×4000"],
+      ["EOS 90D (APS-C)", "M", "4800×3200"], ["EOS 80D (APS-C)", "L", "6000×4000"], ["EOS 77D (APS-C)", "L", "6000×4000"],
+      ["EOS 850D / T8i (APS-C)", "L", "6000×4000"], ["EOS 800D / T7i (APS-C)", "L", "6000×4000"], ["EOS 760D / T6s (APS-C)", "L", "6000×4000"],
+      ["EOS 750D / T6i (APS-C)", "L", "6000×4000"], ["EOS 250D / SL3 (APS-C)", "L", "6000×4000"], ["EOS 200D / SL2 (APS-C)", "L", "6000×4000"],
+      ["EOS M6 Mark II (APS-C)", "M", "4800×3200"], ["EOS M6 (APS-C)", "L", "6000×4000"], ["EOS M5 (APS-C)", "L", "6000×4000"],
+      ["EOS M50 / M50 Mark II (APS-C)", "L", "6000×4000"]
     ],
     Nikon: [
       ["Z9", "Small", "4128×2752", "FX"], ["Z8", "Small", "4128×2752", "FX"],
       ["Z7 / Z7II", "Small", "4128×2752", "FX"], ["Z6 / Z6II", "Medium", "4528×3016", "FX"],
       ["Z6III", "Medium", "≈4528×3024", "FX"], ["Zf", "Medium", "≈4528×3024", "FX"],
       ["Z5", "Medium", "4512×3008", "FX"], ["Z5II", "Medium", "≈4528×3024", "FX"],
-      ["Z50 / Z50II", "Medium", "4176×2784", "DX"], ["Z fc", "Medium", "4176×2784", "DX"],
       ["D6", "Medium", "4176×2784", "FX"], ["D5", "Medium", "4176×2784", "FX"],
       ["D850", "Small", "4128×2752", "FX"], ["D780", "Medium", "4528×3016", "FX"],
-      ["D500", "Medium", "4176×2784", "DX"], ["D7500", "Medium", "4176×2784", "DX"]
+      ["Z50 / Z50II (APS-C)", "Medium", "4176×2784", "DX"], ["Z fc (APS-C)", "Medium", "4176×2784", "DX"], ["Z30 (APS-C)", "Medium", "4176×2784", "DX"],
+      ["D500 (APS-C)", "Medium", "4176×2784", "DX"], ["D7500 (APS-C)", "Medium", "4176×2784", "DX"], ["D7200 (APS-C)", "Medium", "4496×3000", "DX"],
+      ["D5600 (APS-C)", "Medium", "4496×3000", "DX"], ["D5500 (APS-C)", "Medium", "4496×3000", "DX"],
+      ["D3500 (APS-C)", "Medium", "4496×3000", "DX"], ["D3400 (APS-C)", "Medium", "4496×3000", "DX"]
+    ],
+    // Fujifilm X (all APS-C). Sizes by sensor: 16 MP, 24 MP, 26 MP, 40 MP.
+    Fujifilm: [
+      ["X-H2", "M", "5472×3648"], ["X-H2S", "M", "4416×2944"], ["X-H1", "M", "4240×2832"],
+      ["X-T5", "M", "5472×3648"], ["X-T4", "M", "4416×2944"], ["X-T3", "M", "4416×2944"], ["X-T2", "M", "4240×2832"],
+      ["X-T50", "M", "5472×3648"], ["X-T30 III", "M", "4416×2944"], ["X-T30 / X-T30 II", "M", "4416×2944"], ["X-T20", "M", "4240×2832"], ["X-T10", "L", "4896×3264"],
+      ["X-Pro3", "M", "4416×2944"], ["X-Pro2", "M", "4240×2832"],
+      ["X-S20", "M", "4416×2944"], ["X-S10", "M", "4416×2944"], ["X-M5", "M", "4416×2944"],
+      ["X-E5", "M", "5472×3648"], ["X-E4", "M", "4416×2944"], ["X-E3", "M", "4240×2832"]
     ]
   };
   function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
@@ -483,7 +506,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   function checks(b, c){
     var size = c[1], px = c[2];
     if(b === "Sony") return [
-      ["White balance", "<b>AWB</b>, Priority Set in AWB → <b>Standard</b>"],
+      ["White balance", "<b>AWB</b> · if your camera has Priority Set in AWB: <b>Standard</b>"],
       [c[3] === "style" ? "Creative Style" : "Creative Look",
         c[3] === "style" ? "<b>Neutral (NT)</b>" :
         c[3] === "look1" ? "<b>NT (Neutral)</b> · on firmware before 2.0: Creative Style → Neutral" : "<b>NT (Neutral)</b>"],
@@ -496,8 +519,14 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["JPEG quality", "JPEG only (RAW off) with the <b>staircase</b> icon. If there's a JPEG quality 1–10 setting: <b>6</b>, the first staircase step down from 10"],
       ["Image size", "Image quality <b>" + size + "</b> (staircase) · " + px + " px"]
     ];
+    if(b === "Fujifilm") return [
+      ["White balance", "<b>AUTO</b> — plain Auto, not White or Ambience priority"],
+      ["Film Simulation", "<b>PRO Neg. Std</b> — Fujifilm's softest, most neutral colour"],
+      ["Image quality", "<b>NORMAL</b> (no RAW)"],
+      ["Image size", "Image size <b>" + size + " 3:2</b> · " + px + " px"]
+    ];
     return [
-      ["White balance", "<b>AUTO1</b> — Auto, Normal"],
+      ["White balance", "<b>AUTO1</b> — Auto, Normal (older bodies: plain Auto)"],
       ["Picture Control", "<b>Neutral (NL)</b>"],
       ["JPEG quality", "Image quality <b>JPEG normal</b> (no RAW)"],
       ["Image size", "Image area <b>" + c[3] + "</b>, Image size <b>" + size + "</b> · " + px + " px"]
@@ -557,7 +586,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   }
   function updateCount(){
     var c = findCam(cur.b, cur.m);
-    if(!c){ setCount.textContent = ""; setBtn.classList.remove("done"); return; }
+    if(!c){ setCount.textContent = "0/4"; setBtn.classList.remove("done"); return; }
     syncTicks();
     var n = ticks.v.filter(Boolean).length;
     setCount.textContent = n + "/4"; setBtn.classList.toggle("done", n === 4);
@@ -596,8 +625,5 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       navigator.serviceWorker.register('./sw.js');
     }
   </script>
-</body>
-</html>
-
 </body>
 </html>
