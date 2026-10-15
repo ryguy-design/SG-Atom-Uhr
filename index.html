@@ -213,7 +213,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     </div>
     <div class="pick">
       <select id="brand" aria-label="Camera brand">
-        <option value="">Brand…</option><option>Canon</option><option>Fujifilm</option><option>Nikon</option><option>Sony</option>
+        <option value="">Brand…</option><option>Canon</option><option>Fujifilm</option><option>Nikon</option><option>Sony</option><option value="Other">Other brand</option>
       </select>
       <select id="model" aria-label="Camera model" disabled><option value="">Model…</option></select>
     </div>
@@ -639,13 +639,43 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["DSLR · APS-C (DX)", ["D500 (APS-C)", "D7500 (APS-C)", "D7200 (APS-C)", "D5600 (APS-C)", "D5500 (APS-C)", "D3500 (APS-C)", "D3400 (APS-C)"]]
     ]
   };
-  function shortName(m){ return m.replace(" (APS-C)", ""); }
+  // Cameras not in the list: same four checks, general wording
+  var OTHER = "__other", OTHER_CAM = [OTHER, "", "", ""];
+  function shortName(m){ return m === OTHER ? "Other model" : m.replace(" (APS-C)", ""); }
   function has(list, m){ return list.indexOf(m) > -1; }
-  function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
+  function findCam(b, m){ if(m === OTHER && (CAMS[b] || b === "Other")) return OTHER_CAM; var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
 
   // The four checks, worded the way each brand's menu words them
+  var SIZE_ANY = "The <b>smallest</b> JPEG size whose long edge is <b>at least 4000 px</b>. Check the pixel numbers shown in the image size menu";
   function checks(b, c){
     var size = c[1], px = c[2];
+    if(c[0] === OTHER){
+      if(b === "Sony") return [
+        ["White balance", "<b>AWB</b> · if there's Priority Set in AWB: <b>Standard</b>"],
+        ["Creative Style / Look", "<b>Neutral (NT)</b>, or <b>Standard</b> if there's no Neutral"],
+        ["JPEG quality", "<b>JPEG</b> only (RAW off), quality <b>Standard</b>"],
+        ["Image size", SIZE_ANY]];
+      if(b === "Canon") return [
+        ["White balance", "<b>AWB</b> — regular Auto, not AWB W"],
+        ["Picture Style", "<b>Neutral (N)</b>"],
+        ["JPEG quality", "JPEG only (RAW off) with the <b>staircase</b> icon. If there's a JPEG quality 1–10 setting: <b>6</b>"],
+        ["Image size", SIZE_ANY]];
+      if(b === "Fujifilm") return [
+        ["White balance", "<b>AUTO</b> — plain AUTO, not White or Ambience priority"],
+        ["Film Simulation", "<b>PROVIA/STANDARD</b>"],
+        ["Image quality", "<b>NORMAL</b> (no RAW)"],
+        ["Image size", SIZE_ANY + " (3:2)"]];
+      if(b === "Nikon") return [
+        ["White balance", "<b>AUTO1</b> (Normal / Keep overall atmosphere), or plain <b>Auto</b> if there are no options"],
+        ["Picture Control", "<b>Neutral (NL)</b>"],
+        ["JPEG quality", "Image quality <b>JPEG normal</b> (no RAW)"],
+        ["Image size", "Image area <b>FX</b> (DX on APS-C bodies). " + SIZE_ANY]];
+      return [
+        ["White balance", "<b>Auto</b> — the standard auto, not a warm/ambience or white-priority variant"],
+        ["Picture style", "The most <b>neutral</b> profile (Neutral / Natural / Standard), no vivid or creative looks"],
+        ["JPEG quality", "<b>JPEG</b> only (RAW off), the <b>middle</b> quality (Standard / Normal)"],
+        ["Image size", SIZE_ANY]];
+    }
     if(b === "Sony") return [
       ["White balance", has(SONY_NO_AWB_PRIORITY, c[0]) ? "<b>AWB</b> (Auto)" : "<b>AWB</b>, Priority Set in AWB → <b>Standard</b>"],
       [c[3] === "style" || c[3] === "style0" ? "Creative Style" : "Creative Look",
@@ -772,13 +802,18 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
         modelSel.appendChild(og);
       });
     }
+    if(a.b){
+      var og2 = document.createElement("optgroup"); og2.label = "Not in the list";
+      var o2 = document.createElement("option"); o2.value = OTHER; o2.textContent = a.b === "Other" ? "Any camera" : "Other " + a.b + " model";
+      og2.appendChild(o2); modelSel.appendChild(og2);
+    }
     modelSel.disabled = !a.b; modelSel.value = a.m || "";
   }
   function renderRecent(){
     var a = act();
     recentEl.textContent = "";
     recent.forEach(function(r){
-      var bt = document.createElement("button"); bt.type = "button"; bt.textContent = r.b + " " + shortName(r.m);
+      var bt = document.createElement("button"); bt.type = "button"; bt.textContent = r.b === "Other" ? "Other camera" : r.b + " " + shortName(r.m);
       if(r.b === a.b && r.m === a.m) bt.className = "cur";
       bt.addEventListener("click", function(){ choose(r.b, r.m); });
       recentEl.appendChild(bt);
@@ -812,7 +847,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     if(b && m && findCam(b, m)) recent = [{b:b, m:m}].concat(recent.filter(function(r){ return !(r.b === b && r.m === m); })).slice(0, 6);
     save(); refresh();
   }
-  brandSel.addEventListener("change", function(){ choose(brandSel.value, ""); });
+  brandSel.addEventListener("change", function(){ choose(brandSel.value, brandSel.value === "Other" ? OTHER : ""); });
   modelSel.addEventListener("change", function(){ choose(act().b, modelSel.value); });
 
   // ---- Add / remove cameras ----
