@@ -127,6 +127,19 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .chip.plus{min-width:2.3rem; justify-content:center; font-size:1.05rem; background:transparent; border:2px dashed #56626a}
 .chip.plusopt{background:transparent; border:2px dashed var(--ok); color:var(--ok)}
 .chip:disabled{opacity:.35; cursor:default}
+/* Main screen: one row of camera buttons that share the full width; each opens its camera check */
+.strip.main{width:100%}
+.strip.main .chip{flex:1 0 auto; justify-content:center; font-size:1.05rem; font-weight:800; padding:.6rem .9rem; border-radius:12px; gap:.5rem}
+.strip.main .chip .st{font-size:1.05rem}
+.strip.main .chip.plus{flex:0 0 auto; min-width:3rem}
+.strip.main .chip.act{border-color:var(--fg)}
+.strip.main .chip.act:not(.ok):not(.none){border-color:var(--bad)}
+.strip.main .chip.act.ok{border-color:var(--ok)}
+.initrow{display:flex; align-items:center; gap:.7rem; font-weight:700}
+.initrow input{flex:1; min-width:0; font:inherit; font-weight:700; color:var(--fg); background:var(--line); border:1.5px solid transparent; border-radius:8px; padding:.55rem .7rem; text-transform:uppercase; letter-spacing:.06em}
+.initrow input:placeholder-shown{border-color:var(--bad)}
+.initrow input::placeholder{text-transform:none; letter-spacing:0; color:var(--muted); font-weight:400}
+.initrow input:focus-visible{outline:2px solid var(--fg); outline-offset:1px}
 .chip:focus-visible,.addbtn:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .kit{display:flex; flex-direction:column; gap:.55rem}
 .addrow{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap}
@@ -157,7 +170,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   footer{flex-wrap:nowrap; align-items:center; gap:.9rem}
   .setbtn{width:auto; flex-shrink:0; font-size:.95rem; padding:.4rem .85rem; border-radius:10px}
   .setbtn b{font-size:1rem}
-  .cam{width:auto; flex-shrink:1; max-width:45%}
+  .cam{width:auto; flex:1 1 auto; min-width:0; max-width:55%}
   .cam select,.cam input{padding:.35rem .5rem}
   .cam input{width:6.5rem}
   #status{flex:1; min-width:0}
@@ -185,10 +198,8 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 </main>
 
 <footer>
-  <button id="setBtn" class="setbtn" type="button" aria-haspopup="dialog">Camera check <b id="setCount">0/4</b></button>
-  <div class="cam" aria-label="Camera label">
-    <input id="camInit" type="text" maxlength="6" placeholder="SG initials" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="SG initials">
-    <div id="strip" class="strip" aria-label="My cameras"></div>
+  <div class="cam">
+    <div id="strip" class="strip main" aria-label="My cameras: tap to open its camera check"></div>
   </div>
   <div id="status">
     <span id="syncText">Syncing with time server…</span>
@@ -210,6 +221,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       <h2 id="sheetTitle">Camera check</h2>
       <button id="sheetClose" type="button">Done</button>
     </div>
+    <label class="initrow">SG initials
+      <input id="camInit" type="text" maxlength="6" placeholder="e.g. RK" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    </label>
     <div class="kit">
       <div id="tabs" class="strip tabs" aria-label="My cameras"></div>
       <div class="addrow">
@@ -715,7 +729,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     ];
   }
 
-  var sheet = document.getElementById("sheet"), setBtn = document.getElementById("setBtn"), setCount = document.getElementById("setCount");
+  var sheet = document.getElementById("sheet");
   var brandSel = document.getElementById("brand"), modelSel = document.getElementById("model");
   var recentEl = document.getElementById("recent"), listEl = document.getElementById("checklist"), noteEl = document.getElementById("sheetNote");
   var stripEl = document.getElementById("strip"), tabsEl = document.getElementById("tabs");
@@ -776,7 +790,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   function renderStrips(){
     stripEl.textContent = ""; tabsEl.textContent = "";
     kit.cams.forEach(function(c){
-      stripEl.appendChild(chip(c, function(){ addOpen = false; setActive(key(c)); if(!isDone(c)) openSheet(); }));
+      stripEl.appendChild(chip(c, function(){ addOpen = false; var was = key(c) === kit.active; setActive(key(c)); if(was || !isDone(c)) openSheet(); }));
       tabsEl.appendChild(chip(c, function(){ setActive(key(c)); }));
     });
     var hc = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.cams.length - hc;
@@ -848,10 +862,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks start fresh each new day or with New event.";
     updateCount();
   }
-  function updateCount(){
-    var n = countOf(act());
-    setCount.textContent = n + "/4"; setBtn.classList.toggle("done", n === 4);
-  }
+  function updateCount(){}
   function choose(b, m){
     var a = act(); a.b = b; a.m = m;
     if(b && m && findCam(b, m)) recent = [{b:b, m:m}].concat(recent.filter(function(r){ return !(r.b === b && r.m === m); })).slice(0, 6);
@@ -912,8 +923,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   document.getElementById("nbClose").addEventListener("click", hideNext);
 
   function openSheet(){ hideNext(); sheet.hidden = false; document.getElementById("sheetClose").focus(); }
-  function closeSheet(){ sheet.hidden = true; setBtn.focus(); }
-  setBtn.addEventListener("click", openSheet);
+  function closeSheet(){ sheet.hidden = true; var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
   document.getElementById("sheetClose").addEventListener("click", closeSheet);
   sheet.addEventListener("click", function(e){ if(e.target === sheet) closeSheet(); });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !sheet.hidden) closeSheet(); });
