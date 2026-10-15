@@ -198,7 +198,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     <button id="resync" type="button">Sync now</button>
     <label class="switch" for="locToggle">
       <span>Location</span>
-      <input id="locToggle" type="checkbox" role="switch" aria-controls="place" checked>
+      <input id="locToggle" type="checkbox" role="switch" aria-controls="place">
       <span class="track" aria-hidden="true"><span class="knob"></span></span>
     </label>
   </div>
@@ -466,8 +466,8 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   // ================= Location =================
   var placeEl = document.getElementById("place"), subEl = document.getElementById("suburb"), coEl = document.getElementById("coords");
   var locBtn = document.getElementById("locToggle");
-  var watchId = null, lastGeo = null, showLoc = true;
-  try{ showLoc = localStorage.getItem("acLoc") !== "0"; }catch(e){}
+  var watchId = null, lastGeo = null, showLoc = false;
+  try{ showLoc = localStorage.getItem("acLoc") === "1"; }catch(e){}
   function fmt(v,pos,neg){ return Math.abs(v).toFixed(4) + "°" + (v>=0?pos:neg); }
 
   function reverse(lat, lon){
@@ -938,7 +938,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
     camInit.value = ""; kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = [];
     save(); hideNext(); refresh();
-    showLoc = true; applyLoc();
+    showLoc = false; applyLoc();
   });
 
   // A new day starts a new event: re-check whenever the app comes back to the screen
