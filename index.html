@@ -496,19 +496,25 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     Fujifilm: [
       ["X-H2", "M", "5472×3648"], ["X-H2S", "M", "4416×2944"], ["X-H1", "M", "4240×2832"],
       ["X-T5", "M", "5472×3648"], ["X-T4", "M", "4416×2944"], ["X-T3", "M", "4416×2944"], ["X-T2", "M", "4240×2832"],
-      ["X-T50", "M", "5472×3648"], ["X-T30 III", "M", "4416×2944"], ["X-T30 / X-T30 II", "M", "4416×2944"], ["X-T20", "M", "4240×2832"], ["X-T10", "L", "4896×3264"],
+      ["X-T50", "M", "5472×3648"], ["X-T30 III", "M", "4416×2944"], ["X-T30 II", "M", "4416×2944"], ["X-T30", "M", "4416×2944"], ["X-T20", "M", "4240×2832"], ["X-T10", "L", "4896×3264"],
       ["X-Pro3", "M", "4416×2944"], ["X-Pro2", "M", "4240×2832"],
       ["X-S20", "M", "4416×2944"], ["X-S10", "M", "4416×2944"], ["X-M5", "M", "4416×2944"],
       ["X-E5", "M", "5472×3648"], ["X-E4", "M", "4416×2944"], ["X-E3", "M", "4240×2832"]
     ]
   };
+  // White balance menus differ by model (checked against each maker's manuals)
+  var SONY_NO_AWB_PRIORITY = ["α7R II", "α7S II", "α6300 (APS-C)"];
+  var NIKON_PLAIN_AUTO = ["D5600 (APS-C)", "D5500 (APS-C)", "D3500 (APS-C)", "D3400 (APS-C)"];
+  var NIKON_AUTO_NORMAL = ["D5", "D500 (APS-C)", "D850", "D7500 (APS-C)", "D7200 (APS-C)"];
+  var FUJI_AUTO_PRIORITY = ["X-H2", "X-H2S", "X-T5", "X-T4", "X-T50", "X-T30 III", "X-T30 II", "X-S20", "X-S10", "X-M5", "X-E5", "X-E4"];
+  function has(list, m){ return list.indexOf(m) > -1; }
   function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
 
   // The four checks, worded the way each brand's menu words them
   function checks(b, c){
     var size = c[1], px = c[2];
     if(b === "Sony") return [
-      ["White balance", "<b>AWB</b> · if your camera has Priority Set in AWB: <b>Standard</b>"],
+      ["White balance", has(SONY_NO_AWB_PRIORITY, c[0]) ? "<b>AWB</b> (Auto)" : "<b>AWB</b>, Priority Set in AWB → <b>Standard</b>"],
       [c[3] === "style" ? "Creative Style" : "Creative Look",
         c[3] === "style" ? "<b>Neutral (NT)</b>" :
         c[3] === "look1" ? "<b>NT (Neutral)</b> · on firmware before 2.0: Creative Style → Neutral" : "<b>NT (Neutral)</b>"],
@@ -522,13 +528,13 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["Image size", "Image quality <b>" + size + "</b> (staircase) · " + px + " px"]
     ];
     if(b === "Fujifilm") return [
-      ["White balance", "<b>AUTO</b> — plain Auto, not White or Ambience priority"],
+      ["White balance", has(FUJI_AUTO_PRIORITY, c[0]) ? "<b>AUTO</b> — plain AUTO, not White or Ambience priority" : "<b>AUTO</b>"],
       ["Film Simulation", "<b>PROVIA/STANDARD</b>"],
       ["Image quality", "<b>NORMAL</b> (no RAW)"],
       ["Image size", "Image size <b>" + size + " 3:2</b> · " + px + " px"]
     ];
     return [
-      ["White balance", "<b>AUTO1</b> — Auto, Normal (older bodies: plain Auto)"],
+      ["White balance", has(NIKON_PLAIN_AUTO, c[0]) ? "<b>Auto</b>" : has(NIKON_AUTO_NORMAL, c[0]) ? "<b>Auto → Normal</b>" : "<b>Auto → Keep overall atmosphere</b>"],
       ["Picture Control", "<b>Neutral (NL)</b>"],
       ["JPEG quality", "Image quality <b>JPEG normal</b> (no RAW)"],
       ["Image size", "Image area <b>" + c[3] + "</b>, Image size <b>" + size + "</b> · " + px + " px"]
