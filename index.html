@@ -54,9 +54,9 @@ main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:cent
 #place b{color:var(--fg); font-weight:600}
 
 footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:.8rem 1rem; text-align:left; font-size:.8rem; color:var(--muted)}
-.cam{width:100%; display:flex; justify-content:center; gap:.5rem}
+.cam{width:100%; display:flex; justify-content:center; align-items:center; gap:.5rem; min-width:0}
 .cam select,.cam input{font:inherit; font-size:.95rem; color:var(--fg); background:var(--line); border:1px solid transparent; border-radius:8px; padding:.45rem .6rem; min-width:0}
-.cam input{width:8.5rem; text-transform:uppercase; letter-spacing:.06em}
+.cam input{width:7.5rem; flex-shrink:0; text-transform:uppercase; letter-spacing:.06em}
 .cam input::placeholder{text-transform:none; letter-spacing:0; color:var(--muted)}
 .cam select:focus-visible,.cam input:focus-visible{outline:2px solid var(--fg); outline-offset:1px}
 /* Camera label shown on the clock face, so every sync photo says which camera it is */
@@ -111,6 +111,36 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .checklist .d b{color:var(--fg)}
 .checklist input:checked ~ span .t{color:var(--ok)}
 .sheet-note{margin:0; font-size:.78rem; color:var(--muted); line-height:1.4}
+/* Camera strip (main screen) and tabs (panel) */
+.strip{display:flex; gap:.4rem; overflow-x:auto; min-width:0; scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0; display:inline-flex; align-items:center; gap:.35rem; font:inherit; font-size:.85rem; font-weight:700; color:var(--fg);
+  background:var(--line); border:2px solid transparent; border-radius:999px; padding:.35rem .7rem; cursor:pointer; white-space:nowrap}
+.chip .st{font-weight:800; font-variant-numeric:tabular-nums; color:var(--bad)}
+.chip.ok .st{color:var(--ok)}
+.chip.none .st{color:var(--muted)}
+.chip.act{border-color:var(--fg)}
+.chip:focus-visible,.addbtn:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.kit{display:flex; flex-direction:column; gap:.55rem}
+.addrow{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap}
+.addbtn{font:inherit; font-size:.85rem; font-weight:700; color:var(--fg); background:transparent; border:1px dashed #56626a; border-radius:999px; padding:.3rem .8rem; cursor:pointer}
+.addbtn:disabled{opacity:.35; cursor:default}
+.linkbtn{margin-left:auto; font:inherit; font-size:.8rem; color:var(--muted); background:none; border:0; text-decoration:underline; cursor:pointer}
+.linkbtn[hidden]{display:none}
+.endrow{display:flex; justify-content:center; gap:.6rem; flex-wrap:wrap}
+.resetbtn.neutral{color:var(--fg); border-color:#56626a}
+/* Next-camera prompt, shown after a camera's four checks are done */
+.nextbar{position:fixed; left:0; right:0; bottom:0; z-index:9; display:flex; align-items:center; gap:.7rem;
+  background:#12301b; border-top:2px solid var(--ok); color:var(--fg);
+  padding-block:.8rem max(.8rem, env(safe-area-inset-bottom,0px));
+  padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.nextbar[hidden]{display:none}
+.nb-msg{flex:1; min-width:0; display:flex; flex-direction:column; text-align:left}
+.nb-msg b{color:var(--ok); font-size:1rem}
+.nb-msg span{font-size:.85rem; color:#cfe9d6}
+.nb-next{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:#06210e; background:var(--ok); border:0; border-radius:10px; padding:.6rem 1rem; cursor:pointer}
+.nb-close{flex-shrink:0; font:inherit; font-size:1.1rem; color:var(--fg); background:none; border:0; padding:.3rem .4rem; cursor:pointer}
+.nb-next:focus-visible,.nb-close:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .resetbtn{align-self:center; font:inherit; font-size:.9rem; font-weight:700; color:var(--bad); background:transparent; border:1.5px solid var(--bad); border-radius:999px; padding:.45rem 1.1rem; cursor:pointer; margin-top:.2rem}
 .resetbtn.armed{background:var(--bad); color:#fff}
 .resetbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
@@ -120,7 +150,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   footer{flex-wrap:nowrap; align-items:center; gap:.9rem}
   .setbtn{width:auto; flex-shrink:0; font-size:.95rem; padding:.4rem .85rem; border-radius:10px}
   .setbtn b{font-size:1rem}
-  .cam{width:auto; flex-shrink:0}
+  .cam{width:auto; flex-shrink:1; max-width:45%}
   .cam select,.cam input{padding:.35rem .5rem}
   .cam input{width:6.5rem}
   #status{flex:1; min-width:0}
@@ -148,13 +178,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   <button id="setBtn" class="setbtn" type="button" aria-haspopup="dialog">Camera check <b id="setCount">0/4</b></button>
   <div class="cam" aria-label="Camera label">
     <input id="camInit" type="text" maxlength="6" placeholder="SG initials" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="SG initials">
-    <select id="camType" aria-label="Camera type">
-      <option value="HAND CAM">Hand cam</option>
-      <option value="LS">LS</option>
-    </select>
-    <select id="camNum" aria-label="Camera number">
-      <option>1</option><option>2</option><option>3</option><option>4</option>
-    </select>
+    <div id="strip" class="strip" aria-label="My cameras"></div>
   </div>
   <div id="status">
     <span id="syncText">Syncing with time server…</span>
@@ -176,6 +200,14 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       <h2 id="sheetTitle">Camera check</h2>
       <button id="sheetClose" type="button">Done</button>
     </div>
+    <div class="kit">
+      <div id="tabs" class="strip tabs" aria-label="My cameras"></div>
+      <div class="addrow">
+        <button id="addHC" class="addbtn" type="button">+ Hand cam</button>
+        <button id="addLS" class="addbtn" type="button">+ LS</button>
+        <button id="removeCam" class="linkbtn" type="button">Remove this camera</button>
+      </div>
+    </div>
     <div class="pick">
       <select id="brand" aria-label="Camera brand">
         <option value="">Brand…</option><option>Canon</option><option>Fujifilm</option><option>Nikon</option><option>Sony</option>
@@ -185,8 +217,17 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     <div id="recent" class="recent" aria-label="Recently used cameras"></div>
     <ol id="checklist" class="checklist"></ol>
     <p id="sheetNote" class="sheet-note"></p>
-    <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
+    <div class="endrow">
+      <button id="newEvent" class="resetbtn neutral" type="button">New event: clear all ticks</button>
+      <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
+    </div>
   </div>
+</div>
+
+<div id="nextBar" class="nextbar" hidden role="status">
+  <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span></div>
+  <button id="nbNext" class="nb-next" type="button"></button>
+  <button id="nbClose" class="nb-close" type="button" aria-label="Close">✕</button>
 </div>
 
 <script>
@@ -454,24 +495,23 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 
   // ================= Camera label =================
   var camLabelEl = document.getElementById("camLabel");
-  var camType = document.getElementById("camType"), camNum = document.getElementById("camNum"), camInit = document.getElementById("camInit");
-  try{
-    var saved = JSON.parse(localStorage.getItem("acCam") || "{}");
-    if(saved.t) camType.value = saved.t; if(saved.n) camNum.value = saved.n; if(saved.i) camInit.value = saved.i;
-  }catch(e){}
+  var camInit = document.getElementById("camInit");
+  try{ var saved = JSON.parse(localStorage.getItem("acCam") || "{}"); if(saved.i) camInit.value = saved.i; }catch(e){}
   function updateCam(){
     camInit.value = camInit.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
-    var parts = [];
+    var a = act(), parts = [];
     if(camInit.value) parts.push(camInit.value);
-    parts.push(camType.value + " " + camNum.value);
+    parts.push(a.type + " " + a.n);
     camLabelEl.textContent = parts.join(" · ");
-    try{ localStorage.setItem("acCam", JSON.stringify({t:camType.value, n:camNum.value, i:camInit.value})); }catch(e){}
+    try{
+      var old = JSON.parse(localStorage.getItem("acCam") || "{}"); old.i = camInit.value;
+      localStorage.setItem("acCam", JSON.stringify(old));
+    }catch(e){}
     fit();
   }
-  camType.addEventListener("change", updateCam); camNum.addEventListener("change", updateCam); camInit.addEventListener("input", updateCam);
+  camInit.addEventListener("input", updateCam);
   // Done typing: drop the keyboard so the clock is fully visible again
   camInit.addEventListener("keydown", function(e){ if(e.key === "Enter") camInit.blur(); });
-
 
   // ================= Camera settings checklist =================
   // Full frame from 2013, APS-C from 2015, plus Sony RX100 and Canon 60D (used on LS).
@@ -635,116 +675,203 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   var sheet = document.getElementById("sheet"), setBtn = document.getElementById("setBtn"), setCount = document.getElementById("setCount");
   var brandSel = document.getElementById("brand"), modelSel = document.getElementById("model");
   var recentEl = document.getElementById("recent"), listEl = document.getElementById("checklist"), noteEl = document.getElementById("sheetNote");
-  var cur = {b:"", m:""}, recent = [], ticks = {sig:"", v:[]};
-  try{
-    var sv = JSON.parse(localStorage.getItem("acModel") || "{}"); if(sv.b && findCam(sv.b, sv.m)) cur = {b:sv.b, m:sv.m};
-    recent = JSON.parse(localStorage.getItem("acRecent") || "[]").filter(function(r){ return findCam(r.b, r.m); });
-    ticks = JSON.parse(localStorage.getItem("acTicks") || '{"sig":"","v":[]}');
-  }catch(e){}
+  var stripEl = document.getElementById("strip"), tabsEl = document.getElementById("tabs");
+  var nextBar = document.getElementById("nextBar"), nbTitle = document.getElementById("nbTitle"), nbSub = document.getElementById("nbSub"), nbNext = document.getElementById("nbNext");
+
+  // ---- My cameras: saved for good (up to 4 hand cams + 4 LS, each with its own brand/model) ----
+  var MAXN = 4, kit = null, ev = null, recent = [];
+  function key(c){ return c.type + " " + c.n; }
+  function short(c){ return (c.type === "LS" ? "LS" : "HC") + c.n; }
+  function sortKit(){ kit.cams.sort(function(x, y){ return (x.type === y.type ? 0 : x.type === "HAND CAM" ? -1 : 1) || x.n - y.n; }); }
+  function act(){ for(var i=0;i<kit.cams.length;i++) if(key(kit.cams[i]) === kit.active) return kit.cams[i]; kit.active = key(kit.cams[0]); return kit.cams[0]; }
+  function defaultKit(){
+    // First run (or after reset): one hand cam, carrying over any camera chosen in the older version of the app
+    var old = {}, om = {};
+    try{ old = JSON.parse(localStorage.getItem("acCam") || "{}"); om = JSON.parse(localStorage.getItem("acModel") || "{}"); }catch(e){}
+    var ok = om.b && findCam(om.b, om.m);
+    var c = {type: old.t === "LS" ? "LS" : "HAND CAM", n: Math.min(MAXN, Math.max(1, +old.n || 1)), b: ok ? om.b : "", m: ok ? om.m : ""};
+    return {cams:[c], active:key(c)};
+  }
+  try{ kit = JSON.parse(localStorage.getItem("acKit") || "null"); }catch(e){ kit = null; }
+  if(!kit || !kit.cams || !kit.cams.length) kit = defaultKit();
+  kit.cams.forEach(function(c){ if(c.b && !findCam(c.b, c.m)) c.m = ""; });
+  sortKit();
+  try{ recent = JSON.parse(localStorage.getItem("acRecent") || "[]").filter(function(r){ return findCam(r.b, r.m); }); }catch(e){}
+
+  // ---- Ticks belong to one event: they start fresh each new day, or with "New event" ----
+  function today(){ var d = new Date(Date.now() + offset); return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate(); }
+  try{ ev = JSON.parse(localStorage.getItem("acEvent") || "null"); }catch(e){ ev = null; }
+  function syncEvent(){ if(!ev || ev.day !== today() || !ev.ticks) ev = {day: today(), ticks: {}}; }
+  // A camera's ticks also start over if its brand or model changes
+  function ticksOf(c){ syncEvent(); var k = key(c) + "|" + c.b + "|" + c.m; if(!ev.ticks[k]) ev.ticks[k] = [false,false,false,false]; return ev.ticks[k]; }
+  function countOf(c){ return findCam(c.b, c.m) ? ticksOf(c).filter(Boolean).length : 0; }
+  function isDone(c){ return countOf(c) === 4; }
   function save(){
     try{
-      localStorage.setItem("acModel", JSON.stringify(cur));
+      localStorage.setItem("acKit", JSON.stringify(kit));
+      localStorage.setItem("acEvent", JSON.stringify(ev));
       localStorage.setItem("acRecent", JSON.stringify(recent));
-      localStorage.setItem("acTicks", JSON.stringify(ticks));
     }catch(e){}
   }
-  // The checklist belongs to one camera: brand, model, type and number. Any change starts it fresh.
-  function camSig(){ return [cur.b, cur.m, camType.value, camNum.value].join("|"); }
-  function syncTicks(){ var sig = camSig(); if(ticks.sig !== sig) ticks = {sig:sig, v:[false,false,false,false]}; }
+
+  function chip(c, onClick){
+    var bt = document.createElement("button"), n = countOf(c), has = !!findCam(c.b, c.m);
+    bt.type = "button";
+    bt.className = "chip" + (key(c) === kit.active ? " act" : "") + (n === 4 ? " ok" : "") + (!has ? " none" : "");
+    bt.innerHTML = '<span class="nm"></span><span class="st"></span>';
+    bt.firstChild.textContent = short(c);
+    bt.lastChild.textContent = n === 4 ? "✓" : has ? n + "/4" : "set up";
+    bt.setAttribute("aria-label", key(c) + (n === 4 ? ", checked" : has ? ", " + n + " of 4 checked" : ", not set up"));
+    bt.addEventListener("click", onClick);
+    return bt;
+  }
+  function renderStrips(){
+    stripEl.textContent = ""; tabsEl.textContent = "";
+    kit.cams.forEach(function(c){
+      stripEl.appendChild(chip(c, function(){ setActive(key(c)); if(!isDone(c)) openSheet(); }));
+      tabsEl.appendChild(chip(c, function(){ setActive(key(c)); }));
+    });
+    var hc = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.cams.length - hc;
+    document.getElementById("addHC").disabled = hc >= MAXN;
+    document.getElementById("addLS").disabled = ls >= MAXN;
+    document.getElementById("removeCam").hidden = kit.cams.length < 2;
+  }
+  function setActive(k){ kit.active = k; save(); hideNext(); refresh(); }
+  function refresh(){
+    var a = act();
+    brandSel.value = a.b; fillModels(); renderRecent(); renderList(); renderStrips(); updateCam();
+  }
 
   function fillModels(){
+    var a = act();
     modelSel.textContent = "";
     var first = document.createElement("option"); first.value = ""; first.textContent = "Model…"; modelSel.appendChild(first);
-    if(GROUPS[cur.b]){
+    if(GROUPS[a.b]){
       // Grouped list: body type headings, flagship first, short names only
-      GROUPS[cur.b].forEach(function(g){
+      GROUPS[a.b].forEach(function(g){
         var og = document.createElement("optgroup"); og.label = g[0];
-        g[1].forEach(function(m){ if(!findCam(cur.b, m)) return; var o = document.createElement("option"); o.value = m; o.textContent = shortName(m); og.appendChild(o); });
+        g[1].forEach(function(m){ if(!findCam(a.b, m)) return; var o = document.createElement("option"); o.value = m; o.textContent = shortName(m); og.appendChild(o); });
         modelSel.appendChild(og);
       });
-    } else {
-      (CAMS[cur.b] || []).slice().sort(newest).forEach(function(c){
-        var o = document.createElement("option"); o.value = c[0]; o.textContent = c[0] + (yearOf(c[0]) ? "  ·  " + yearOf(c[0]) : ""); modelSel.appendChild(o);
-      });
     }
-    modelSel.disabled = !cur.b; modelSel.value = cur.m || "";
+    modelSel.disabled = !a.b; modelSel.value = a.m || "";
   }
   function renderRecent(){
+    var a = act();
     recentEl.textContent = "";
     recent.forEach(function(r){
       var bt = document.createElement("button"); bt.type = "button"; bt.textContent = r.b + " " + shortName(r.m);
-      if(r.b === cur.b && r.m === cur.m) bt.className = "cur";
+      if(r.b === a.b && r.m === a.m) bt.className = "cur";
       bt.addEventListener("click", function(){ choose(r.b, r.m); });
       recentEl.appendChild(bt);
     });
   }
   function renderList(){
+    var a = act(), c = findCam(a.b, a.m);
     listEl.textContent = "";
-    var c = findCam(cur.b, cur.m);
-    if(!c){ noteEl.textContent = "Choose the camera brand and model to see its exact menu settings."; updateCount(); return; }
-    syncTicks();
-    checks(cur.b, c).forEach(function(item, i){
+    if(!c){ noteEl.textContent = "Choose the brand and model of " + key(a) + " to see its exact menu settings."; updateCount(); return; }
+    var t = ticksOf(a);
+    checks(a.b, c).forEach(function(item, i){
       var li = document.createElement("li"), lb = document.createElement("label"), cb = document.createElement("input"), sp = document.createElement("span");
-      cb.type = "checkbox"; cb.id = "chk" + i; cb.checked = !!ticks.v[i];
-      cb.addEventListener("change", function(){ ticks.v[i] = cb.checked; save(); updateCount(); });
+      cb.type = "checkbox"; cb.id = "chk" + i; cb.checked = !!t[i];
+      cb.addEventListener("change", function(){
+        t[i] = cb.checked; save(); updateCount(); renderStrips();
+        if(isDone(a)) setTimeout(function(){ closeSheet(); showNext(a); }, 350);
+      });
       sp.innerHTML = '<span class="t"></span><span class="d">' + item[1] + "</span>";
       sp.firstChild.textContent = item[0];
       lb.appendChild(cb); lb.appendChild(sp); li.appendChild(lb); listEl.appendChild(li);
     });
-    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Ticks reset when the camera, type or number changes.";
+    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks start fresh each new day or with New event.";
     updateCount();
   }
   function updateCount(){
-    var c = findCam(cur.b, cur.m);
-    if(!c){ setCount.textContent = "0/4"; setBtn.classList.remove("done"); return; }
-    syncTicks();
-    var n = ticks.v.filter(Boolean).length;
+    var n = countOf(act());
     setCount.textContent = n + "/4"; setBtn.classList.toggle("done", n === 4);
   }
   function choose(b, m){
-    cur = {b:b, m:m};
-    if(b && m && findCam(b, m)){
-      recent = [{b:b, m:m}].concat(recent.filter(function(r){ return !(r.b === b && r.m === m); })).slice(0, 6);
-    }
-    brandSel.value = b; fillModels(); renderRecent(); renderList(); save();
+    var a = act(); a.b = b; a.m = m;
+    if(b && m && findCam(b, m)) recent = [{b:b, m:m}].concat(recent.filter(function(r){ return !(r.b === b && r.m === m); })).slice(0, 6);
+    save(); refresh();
   }
   brandSel.addEventListener("change", function(){ choose(brandSel.value, ""); });
-  modelSel.addEventListener("change", function(){ choose(cur.b, modelSel.value); });
-  function openSheet(){ sheet.hidden = false; document.getElementById("sheetClose").focus(); }
+  modelSel.addEventListener("change", function(){ choose(act().b, modelSel.value); });
+
+  // ---- Add / remove cameras ----
+  function addCam(type){
+    var used = kit.cams.filter(function(c){ return c.type === type; }).map(function(c){ return c.n; });
+    for(var n = 1; n <= MAXN; n++) if(used.indexOf(n) < 0) break;
+    if(n > MAXN) return;
+    var c = {type:type, n:n, b:"", m:""}; kit.cams.push(c); sortKit(); kit.active = key(c); save(); refresh();
+  }
+  document.getElementById("addHC").addEventListener("click", function(){ addCam("HAND CAM"); });
+  document.getElementById("addLS").addEventListener("click", function(){ addCam("LS"); });
+  document.getElementById("removeCam").addEventListener("click", function(){
+    if(kit.cams.length < 2) return;
+    var k = kit.active; kit.cams = kit.cams.filter(function(c){ return key(c) !== k; }); kit.active = key(kit.cams[0]); save(); refresh();
+  });
+
+  // ---- Next-camera prompt ----
+  function nextAfter(a){
+    var i = kit.cams.indexOf(a);
+    for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && !isDone(c)) return c; }
+    return null;
+  }
+  var nextTarget = null;
+  function showNext(a){
+    nextTarget = nextAfter(a);
+    nbTitle.textContent = "✓ " + key(a) + " ready";
+    nbSub.textContent = nextTarget ? "Photograph the clock now, then go to the next camera." : "Photograph the clock now. That's every camera done.";
+    nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : "All done ✓";
+    nextBar.hidden = false;
+  }
+  function hideNext(){ nextBar.hidden = true; }
+  nbNext.addEventListener("click", function(){
+    hideNext();
+    if(nextTarget){ setActive(key(nextTarget)); openSheet(); }
+  });
+  document.getElementById("nbClose").addEventListener("click", hideNext);
+
+  function openSheet(){ hideNext(); sheet.hidden = false; document.getElementById("sheetClose").focus(); }
   function closeSheet(){ sheet.hidden = true; setBtn.focus(); }
   setBtn.addEventListener("click", openSheet);
   document.getElementById("sheetClose").addEventListener("click", closeSheet);
   sheet.addEventListener("click", function(e){ if(e.target === sheet) closeSheet(); });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !sheet.hidden) closeSheet(); });
-  // Changing camera type or number also starts a fresh checklist
-  camType.addEventListener("change", function(){ renderList(); save(); });
-  camNum.addEventListener("change", function(){ renderList(); save(); });
-  // Reset everything to how the app first opens. Needs a second tap within 4 s so it can't happen by accident.
-  var resetBtn = document.getElementById("resetAll"), resetTimer = null;
-  resetBtn.addEventListener("click", function(){
-    if(!resetBtn.classList.contains("armed")){
-      resetBtn.classList.add("armed"); resetBtn.textContent = "Tap again to reset everything";
-      resetTimer = setTimeout(function(){ resetBtn.classList.remove("armed"); resetBtn.textContent = "Reset all to default"; }, 4000);
-      return;
-    }
-    clearTimeout(resetTimer);
-    camInit.value = ""; camType.value = "HAND CAM"; camNum.value = "1";
-    cur = {b:"", m:""}; recent = []; ticks = {sig:"", v:[]};
-    try{ ["acCam","acModel","acRecent","acTicks","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
-    brandSel.value = ""; fillModels(); renderRecent(); renderList();
-    updateCam();
-    showLoc = true; applyLoc();
-    resetBtn.classList.remove("armed"); resetBtn.textContent = "Reset done";
-    setTimeout(function(){ resetBtn.textContent = "Reset all to default"; }, 2000);
+
+  // Two-tap buttons: first tap arms (red), second tap within 4 s acts
+  function twoTap(btn, label, armedLabel, action){
+    var t = null;
+    btn.addEventListener("click", function(){
+      if(!btn.classList.contains("armed")){
+        btn.classList.add("armed"); btn.textContent = armedLabel;
+        t = setTimeout(function(){ btn.classList.remove("armed"); btn.textContent = label; }, 4000);
+        return;
+      }
+      clearTimeout(t); btn.classList.remove("armed"); action();
+      btn.textContent = "Done ✓"; setTimeout(function(){ btn.textContent = label; }, 1800);
+    });
+  }
+  twoTap(document.getElementById("newEvent"), "New event: clear all ticks", "Tap again to clear all ticks", function(){
+    ev = {day: today(), ticks: {}}; save(); hideNext(); refresh();
   });
-  brandSel.value = cur.b; fillModels(); renderRecent(); renderList();
+  twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", function(){
+    try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+    camInit.value = ""; kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = [];
+    save(); hideNext(); refresh();
+    showLoc = true; applyLoc();
+  });
+
+  // A new day starts a new event: re-check whenever the app comes back to the screen
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible"){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); refresh(); } } });
+  refresh();
 
   // ================= Keep screen awake =================
   function wake(){ if(navigator.wakeLock && document.visibilityState==="visible") navigator.wakeLock.request("screen").catch(function(){}); }
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible"){ wake(); sync(); } });
 
   setInterval(sync, 10*60*1000);
-  render(); updateCam(); applyLoc(); sync(); wake(); tick();
+  render(); applyLoc(); sync(); wake(); tick();
   window.addEventListener("load", fit); setTimeout(fit, 1000);
 })();
 </script>
