@@ -77,6 +77,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .switch input:checked + .track .knob{transform:translateX(1rem); background:var(--bg)}
 .controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
 /* Camera settings button + sheet */
+/* Shown while location is on: a photo of the screen reveals the exact position */
+.locwarn{width:100%; margin:0; font-size:.78rem; line-height:1.35; color:var(--warn); text-align:center}
+.locwarn[hidden]{display:none}
 /* Camera settings: a full-width button with the tick count; red until all four are done */
 .setbtn{width:100%; display:flex; align-items:center; justify-content:center; gap:.6rem;
   font:inherit; font-size:1.15rem; font-weight:800; letter-spacing:.02em; color:var(--fg);
@@ -150,6 +153,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       <span class="track" aria-hidden="true"><span class="knob"></span></span>
     </label>
   </div>
+  <p id="locWarn" class="locwarn">⚠️ Exact GPS location is on screen. Anyone who sees a photo of it (e.g. in a group chat) can see where you are.</p>
 </footer>
 
 <div id="sheet" class="sheet" hidden>
@@ -418,7 +422,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   }
   // GPS is switched fully off while hidden, to save battery
   function stopGeo(){ if(watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId); watchId = null; }
-  function applyLoc(){ placeEl.hidden = !showLoc; locBtn.checked = showLoc; if(showLoc) startGeo(); else stopGeo(); fit(); }
+  function applyLoc(){ document.getElementById("locWarn").hidden = !showLoc; placeEl.hidden = !showLoc; locBtn.checked = showLoc; if(showLoc) startGeo(); else stopGeo(); fit(); }
   locBtn.addEventListener("change", function(){
     showLoc = locBtn.checked;
     try{ localStorage.setItem("acLoc", showLoc ? "1" : "0"); }catch(e){}
