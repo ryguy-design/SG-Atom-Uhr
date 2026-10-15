@@ -1,6 +1,6 @@
 {
   "name": "SG-Atom-Uhr",
-  "short_name": "SG-Atom-Uhr by RYS",
+  "short_name": "Ryan's SG Atomic Hr",
   "description": "Atomic Clock Web Application",
   "start_url": "./index.html",
   "display": "standalone",
