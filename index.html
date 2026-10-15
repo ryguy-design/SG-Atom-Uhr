@@ -120,6 +120,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .chip.ok .st{color:var(--ok)}
 .chip.none .st{color:var(--muted)}
 .chip.act{border-color:var(--fg)}
+.chip.plus{min-width:2.3rem; justify-content:center; font-size:1.05rem; background:transparent; border:2px dashed #56626a}
+.chip.plusopt{background:transparent; border:2px dashed var(--ok); color:var(--ok)}
+.chip:disabled{opacity:.35; cursor:default}
 .chip:focus-visible,.addbtn:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .kit{display:flex; flex-direction:column; gap:.55rem}
 .addrow{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap}
@@ -725,13 +728,28 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     bt.addEventListener("click", onClick);
     return bt;
   }
+  var addOpen = false;   // main-screen "+" expanded into "Hand cam" / "LS"
+  function addChip(label, cls, onClick, disabled){
+    var bt = document.createElement("button"); bt.type = "button"; bt.className = "chip " + cls; bt.textContent = label;
+    bt.disabled = !!disabled; bt.addEventListener("click", onClick); return bt;
+  }
   function renderStrips(){
     stripEl.textContent = ""; tabsEl.textContent = "";
     kit.cams.forEach(function(c){
-      stripEl.appendChild(chip(c, function(){ setActive(key(c)); if(!isDone(c)) openSheet(); }));
+      stripEl.appendChild(chip(c, function(){ addOpen = false; setActive(key(c)); if(!isDone(c)) openSheet(); }));
       tabsEl.appendChild(chip(c, function(){ setActive(key(c)); }));
     });
     var hc = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.cams.length - hc;
+    // "+" on the main screen: tap to choose Hand cam or LS, then that camera's setup opens
+    if(hc < MAXN || ls < MAXN){
+      if(!addOpen){
+        stripEl.appendChild(addChip("+", "plus", function(){ addOpen = true; renderStrips(); var e = stripEl.lastChild; if(e && e.scrollIntoView) e.scrollIntoView({inline:"end", block:"nearest"}); }));
+      } else {
+        stripEl.appendChild(addChip("+ Hand cam", "plusopt", function(){ addOpen = false; addCam("HAND CAM"); openSheet(); }, hc >= MAXN));
+        stripEl.appendChild(addChip("+ LS", "plusopt", function(){ addOpen = false; addCam("LS"); openSheet(); }, ls >= MAXN));
+        stripEl.appendChild(addChip("✕", "plus", function(){ addOpen = false; renderStrips(); }));
+      }
+    }
     document.getElementById("addHC").disabled = hc >= MAXN;
     document.getElementById("addLS").disabled = ls >= MAXN;
     document.getElementById("removeCam").hidden = kit.cams.length < 2;
