@@ -558,7 +558,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["Image size", "Image size <b>" + size + " 3:2</b> · " + px + " px"]
     ];
     return [
-      ["White balance", has(NIKON_PLAIN_AUTO, c[0]) ? "<b>Auto</b>" : has(NIKON_AUTO_NORMAL, c[0]) ? "<b>Auto → Normal</b>" : "<b>Auto → Keep overall atmosphere</b>"],
+      ["White balance", has(NIKON_PLAIN_AUTO, c[0]) ? "<b>Auto</b> (this model has no AUTO0/1/2 options)" : has(NIKON_AUTO_NORMAL, c[0]) ? "<b>AUTO1</b> — Auto → Normal" : "<b>AUTO1</b> — Auto → Keep overall atmosphere"],
       ["Picture Control", "<b>Neutral (NL)</b>"],
       ["JPEG quality", "Image quality <b>JPEG normal</b> (no RAW)"],
       ["Image size", "Image area <b>" + c[3] + "</b>, Image size <b>" + size + "</b> · " + px + " px"]
