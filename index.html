@@ -30,14 +30,14 @@ body{
   padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px));
   -webkit-tap-highlight-color:transparent;
 }
-main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(var(--u)*.28)}
+main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:calc(var(--u)*.2)}
 .row{display:flex; align-items:flex-end; justify-content:center; font-size:var(--u); line-height:1}
-.daydate{display:flex; flex-direction:column; align-items:center; gap:calc(var(--u)*.28); font-size:calc(var(--u)*.78)}
+.daydate{display:flex; flex-direction:column; align-items:center; gap:calc(var(--u)*.2); font-size:calc(var(--u)*.78)}
 .daydate .row{font-size:1em}
 /* Landscape: day and date share one line so the time can grow to fill the width */
 @media (orientation:landscape){
   .daydate{flex-direction:row; gap:.7em; font-size:calc(var(--u)*.5)}
-  main{gap:calc(var(--u)*.22)}
+  main{gap:calc(var(--u)*.16)}
 }
 /* LCD characters drawn in-page: 14-segment style, rounded bars, faint unlit segments; fixed widths so nothing shifts */
 .row svg{display:block; height:1em; width:.635em; margin:0 .05em; overflow:visible}
@@ -48,8 +48,8 @@ main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:cent
 
 /* Which timezone the clock shows */
 .tz{font-family:var(--sans); font-weight:700; font-size:calc(var(--u)*.2); letter-spacing:.08em; color:var(--muted); white-space:nowrap}
-#place{font-size:clamp(.8rem,2.6vmin,1.05rem); color:var(--muted); min-height:1.3em; margin-top:calc(var(--u)*.1)}
-#place[hidden]{display:none}
+#place{flex-shrink:0; font-size:clamp(.8rem,2.6vmin,1.05rem); color:var(--muted); line-height:1.35; height:2.8em; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis}
+#place[hidden]{display:block; visibility:hidden}
 #place b{color:var(--fg); font-weight:600}
 
 footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:.8rem 1rem; text-align:left; font-size:.8rem; color:var(--muted)}
@@ -78,7 +78,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
 /* Camera settings button + sheet */
 /* Shown while location is on: a photo of the screen reveals the exact position */
-.locwarn{margin-top:.3em; font-size:.85em; font-weight:600; color:var(--warn)}
+.locwarn{font-size:.85em; font-weight:600; color:var(--warn)}
 /* Camera settings: a full-width button with the tick count; red until all four are done */
 .setbtn{width:100%; display:flex; align-items:center; justify-content:center; gap:.6rem;
   font:inherit; font-size:1.15rem; font-weight:800; letter-spacing:.02em; color:var(--fg);
@@ -111,6 +111,18 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .checklist input:checked ~ span .t{color:var(--ok)}
 .sheet-note{margin:0; font-size:.78rem; color:var(--muted); line-height:1.4}
 .sheet button:focus-visible,.sheet select:focus-visible,.checklist input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+/* Landscape: everything at the bottom on one compact line, so the clock gets the height */
+@media (orientation:landscape){
+  footer{flex-wrap:nowrap; align-items:center; gap:.9rem}
+  .setbtn{width:auto; flex-shrink:0; font-size:.95rem; padding:.4rem .85rem; border-radius:10px}
+  .setbtn b{font-size:1rem}
+  .cam{width:auto; flex-shrink:0}
+  .cam select,.cam input{padding:.35rem .5rem}
+  .cam input{width:6.5rem}
+  #status{flex:1; min-width:0}
+  #syncText{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  #detail{display:none}
+}
 @media (max-width:420px){ footer{flex-direction:column; align-items:center; text-align:center} #status{align-items:center} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -328,25 +340,33 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     var w = Math.max(tw, daydate.scrollWidth);
     // Never measure an empty display (that's what made it blow up on first open)
     if(w < 200 || timeRow.offsetHeight < 50 || !mainEl.clientWidth || !lw){ root.style.setProperty("--u", fitted || "12vw"); return; }
-    var placeH = placeEl.hidden ? 0 : placeEl.offsetHeight;
-    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + 56 + (placeEl.hidden ? 0 : 28);
-    var availW = mainEl.clientWidth*0.94, availH = mainEl.clientHeight*0.92 - placeH;
+    // The location block always keeps its space, so toggling it never changes the clock size
+    var gap = parseFloat(getComputedStyle(mainEl).rowGap) || 20;
+    var placeH = placeEl.offsetHeight;
+    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + gap*3;
+    var availW = mainEl.clientWidth*0.985, availH = mainEl.clientHeight*0.97 - placeH;
     var portrait = window.innerHeight >= window.innerWidth, scale;
     if(portrait){
       // Camera label scales with the clock; the longest label would be exactly as wide as the time
       var k = tw / lw;
       root.style.setProperty("--labk", k.toFixed(4));
-      scale = Math.min(availW / w, availH / (rest + lh*k + 28));
+      scale = Math.min(availW / w, availH / (rest + lh*k + gap));
     } else {
       // Landscape: label keeps its phone-width (portrait) size and doesn't grow
       var shortSide = Math.min(window.innerWidth, window.innerHeight);
       var labelPx = Math.min(100, (shortSide - 32) * 0.94 * 100 / lw);
       camLabelEl.style.fontSize = labelPx.toFixed(1) + "px";
-      var labelH = lh * labelPx / 100 + 28;
+      var labelH = lh * labelPx / 100 + gap;
       scale = Math.min(availW / w, (availH - labelH) / rest);
     }
-    fitted = Math.max(10, Math.min(400, 100*scale)).toFixed(1) + "px";
-    root.style.setProperty("--u", fitted);
+    var u = Math.max(10, Math.min(400, 100*scale));
+    root.style.setProperty("--u", u.toFixed(1) + "px");
+    // Final check: if anything still spills out of the space, shrink just enough to fit
+    for(var i = 0; i < 3 && mainEl.scrollHeight > mainEl.clientHeight + 1; i++){
+      u *= mainEl.clientHeight / mainEl.scrollHeight * 0.99;
+      root.style.setProperty("--u", u.toFixed(1) + "px");
+    }
+    fitted = u.toFixed(1) + "px";
   }
   var fitted = "";
   window.addEventListener("resize", fit);
