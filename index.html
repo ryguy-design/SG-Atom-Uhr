@@ -863,7 +863,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   });
 
   // A new day starts a new event: re-check whenever the app comes back to the screen
-  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible"){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); refresh(); } } });
+  function dayCheck(){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); hideNext(); refresh(); } }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") dayCheck(); });
+  setInterval(dayCheck, 60*1000);   // also clears at midnight while the app stays open
   refresh();
 
   // ================= Keep screen awake =================
