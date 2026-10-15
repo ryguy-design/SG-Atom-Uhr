@@ -859,9 +859,25 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   }
   document.getElementById("addHC").addEventListener("click", function(){ addCam("HAND CAM"); });
   document.getElementById("addLS").addEventListener("click", function(){ addCam("LS"); });
+  // Remove the selected camera, close the gap in numbering (HC1, HC3, HC4 → HC1, HC2, HC3),
+  // and select the one before it, so repeated taps remove 4 → 3 → 2 → 1
   document.getElementById("removeCam").addEventListener("click", function(){
     if(kit.cams.length < 2) return;
-    var k = kit.active; kit.cams = kit.cams.filter(function(c){ return key(c) !== k; }); kit.active = key(kit.cams[0]); save(); refresh();
+    var a = act(), type = a.type;
+    var same = kit.cams.filter(function(c){ return c.type === type; });
+    var pos = same.indexOf(a);
+    kit.cams = kit.cams.filter(function(c){ return c !== a; });
+    syncEvent();
+    kit.cams.filter(function(c){ return c.type === type; }).forEach(function(c, i){
+      var n = i + 1; if(c.n === n) return;
+      // keep this event's ticks with the camera when its number changes
+      var oldK = key(c) + "|" + c.b + "|" + c.m; c.n = n; var newK = key(c) + "|" + c.b + "|" + c.m;
+      if(ev.ticks[oldK]){ ev.ticks[newK] = ev.ticks[oldK]; delete ev.ticks[oldK]; }
+    });
+    sortKit();
+    var left = kit.cams.filter(function(c){ return c.type === type; });
+    var pick = left.length ? left[Math.max(0, pos - 1)] : kit.cams[0];
+    kit.active = key(pick); save(); refresh();
   });
 
   // ---- Next-camera prompt ----
