@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+ <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+</head> 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Atomic Clock</title>
@@ -587,5 +590,12 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   window.addEventListener("load", fit); setTimeout(fit, 1000);
 })();
 </script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>
+
 </body>
 </html>
