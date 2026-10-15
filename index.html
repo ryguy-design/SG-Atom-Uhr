@@ -469,18 +469,19 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 
 
   // ================= Camera settings checklist =================
+  // Full frame from 2013, APS-C from 2015.
   // Smallest JPEG size whose long edge is at least 4000 px, per body (3:2, full-frame / native image area).
   // Sources: Sony Help Guides, Canon Europe spec pages, Nikon online manuals.
   var CAMS = {
     Sony: [
       ["α1", "S", "4320×2880", "look1"], ["α1 II", "S", "4320×2880", "look"],
       ["α9", "L", "6000×4000", "style"], ["α9 II", "L", "6000×4000", "style"], ["α9 III", "L", "6000×4000", "look"],
-      ["α7 III", "L", "6000×4000", "style"], ["α7 IV", "M", "4608×3072", "look"], ["α7 V", "M", "4608×3072", "look"],
-      ["α7R II", "M", "5168×3448", "style"], ["α7R III / IIIA", "M", "5168×3448", "style"],
+      ["α7", "L", "6000×4000", "style"], ["α7 II", "L", "6000×4000", "style"], ["α7 III", "L", "6000×4000", "style"], ["α7 IV", "M", "4608×3072", "look"], ["α7 V", "M", "4608×3072", "look"],
+      ["α7R", "M", "4800×3200", "style"], ["α7R II", "M", "5168×3448", "style"], ["α7R III / IIIA", "M", "5168×3448", "style"],
       ["α7R IV / IVA", "S", "4752×3168", "style"], ["α7R V", "S", "4752×3168", "look"],
-      ["α7S II", "L", "4240×2832", "style"], ["α7S III", "L", "4240×2832", "look"],
+      ["α7S", "L", "4240×2832", "style"], ["α7S II", "L", "4240×2832", "style"], ["α7S III", "L", "4240×2832", "look"],
       ["α7C", "L", "6000×4000", "style"], ["α7C II", "M", "4608×3072", "look"], ["α7CR", "S", "4752×3168", "look"],
-      ["ZV-E1", "L", "4240×2832", "look"],
+      ["ZV-E1", "L", "4240×2832", "look"], ["α99 II", "M", "5168×3448", "style"],
       ["α6100 (APS-C)", "M", "4240×2832", "style"], ["α6300 (APS-C)", "M", "4240×2832", "style"], ["α6400 (APS-C)", "M", "4240×2832", "style"],
       ["α6500 (APS-C)", "M", "4240×2832", "style"], ["α6600 (APS-C)", "M", "4240×2832", "style"], ["α6700 (APS-C)", "M", "4384×2920", "look"],
       ["ZV-E10 (APS-C)", "M", "4240×2832", "style"], ["ZV-E10 II (APS-C)", "M", "4384×2920", "look"]
@@ -507,6 +508,8 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["Z5", "Medium", "4512×3008", "FX"], ["Z5II", "Medium", "≈4528×3024", "FX"],
       ["D6", "Medium", "4176×2784", "FX"], ["D5", "Medium", "4176×2784", "FX"],
       ["D850", "Small", "4128×2752", "FX"], ["D780", "Medium", "4528×3016", "FX"],
+      ["D810", "Medium", "5520×3680", "FX"], ["D750", "Medium", "4512×3008", "FX"], ["D610", "Medium", "4512×3008", "FX"],
+      ["D4S", "Large", "4928×3280", "FX"], ["Df", "Large", "4928×3280", "FX"],
       ["Z50 / Z50II (APS-C)", "Medium", "4176×2784", "DX"], ["Z fc (APS-C)", "Medium", "4176×2784", "DX"], ["Z30 (APS-C)", "Medium", "4176×2784", "DX"],
       ["D500 (APS-C)", "Medium", "4176×2784", "DX"], ["D7500 (APS-C)", "Medium", "4176×2784", "DX"], ["D7200 (APS-C)", "Medium", "4496×3000", "DX"],
       ["D5600 (APS-C)", "Medium", "4496×3000", "DX"], ["D5500 (APS-C)", "Medium", "4496×3000", "DX"],
@@ -523,9 +526,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     ]
   };
   // White balance menus differ by model (checked against each maker's manuals)
-  var SONY_NO_AWB_PRIORITY = ["α7R II", "α7S II", "α6300 (APS-C)"];
+  var SONY_NO_AWB_PRIORITY = ["α7", "α7 II", "α7R", "α7R II", "α7S", "α7S II", "α6300 (APS-C)"];
   var NIKON_PLAIN_AUTO = ["D5600 (APS-C)", "D5500 (APS-C)", "D3500 (APS-C)", "D3400 (APS-C)"];
-  var NIKON_AUTO_NORMAL = ["D5", "D500 (APS-C)", "D850", "D7500 (APS-C)", "D7200 (APS-C)"];
+  var NIKON_AUTO_NORMAL = ["D5", "D500 (APS-C)", "D850", "D7500 (APS-C)", "D7200 (APS-C)", "D810", "D750", "D610", "D4S", "Df"];
   var FUJI_AUTO_PRIORITY = ["X-H2", "X-H2S", "X-T5", "X-T4", "X-T50", "X-T30 III", "X-T30 II", "X-S20", "X-S10", "X-M5", "X-E5", "X-E4"];
   function has(list, m){ return list.indexOf(m) > -1; }
   function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
@@ -538,7 +541,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       [c[3] === "style" ? "Creative Style" : "Creative Look",
         c[3] === "style" ? "<b>Neutral (NT)</b>" :
         c[3] === "look1" ? "<b>NT (Neutral)</b> · on firmware before 2.0: Creative Style → Neutral" : "<b>NT (Neutral)</b>"],
-      ["JPEG quality", "File format <b>JPEG</b> only (RAW off), JPEG Quality <b>Standard</b>"],
+      ["JPEG quality", c[3] === "style" ? "Quality <b>Standard</b> (JPEG only, not RAW or RAW & JPEG)" : "File Format <b>JPEG</b> (RAW off), JPEG Quality <b>Standard</b>"],
       ["Image size", "JPEG Image Size <b>" + size + "</b> · " + px + " px"]
     ];
     if(b === "Canon") return [
