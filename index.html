@@ -63,6 +63,10 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .camlabel{font-family:var(--sans); font-weight:900; font-size:calc(var(--u)*var(--labk,.68)); line-height:1; letter-spacing:.04em; white-space:nowrap;
   background:var(--fg); color:var(--bg); padding:.14em .38em .12em; border-radius:.14em}
 .camlabel:empty{display:none}
+/* Brand and model, small and grey under the white label */
+.camwrap{display:flex; flex-direction:column; align-items:center; gap:calc(var(--u)*.07)}
+.cammodel{font-family:var(--sans); font-weight:600; font-size:calc(var(--u)*.2); letter-spacing:.04em; color:var(--muted); white-space:nowrap}
+.cammodel:empty{display:none}
 #status{display:flex; flex-direction:column; gap:.15rem; min-width:0}
 #syncText{color:var(--muted)}
 .ok #syncText{color:var(--ok)}
@@ -167,7 +171,10 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 <body>
 
 <main aria-live="off">
-  <div id="camLabel" class="camlabel" aria-label="Camera"></div>
+  <div class="camwrap">
+    <div id="camLabel" class="camlabel" aria-label="Camera"></div>
+    <div id="camModel" class="cammodel" aria-label="Camera model"></div>
+  </div>
   <div class="daydate">
     <div class="row" id="dayRow" aria-label="Day"></div>
     <div class="row" id="dateRow" aria-label="Date"></div>
@@ -392,7 +399,8 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     // The location block always keeps its space, so toggling it never changes the clock size
     var gap = parseFloat(getComputedStyle(mainEl).rowGap) || 20;
     var placeH = placeEl.offsetHeight;
-    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + gap*3;
+    var modelEl = document.getElementById("camModel");
+    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + gap*3 + (modelEl.textContent ? modelEl.offsetHeight + gap*0.35 : 0);
     var availW = mainEl.clientWidth*0.985, availH = mainEl.clientHeight*0.97 - placeH;
     var portrait = window.innerHeight >= window.innerWidth, scale;
     if(portrait){
@@ -506,6 +514,8 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     if(camInit.value) parts.push(camInit.value);
     parts.push(a.type + " " + a.n);
     camLabelEl.textContent = parts.join(" · ");
+    document.getElementById("camModel").textContent =
+      !findCam(a.b, a.m) ? "" : a.m === OTHER ? (a.b === "Other" ? "Other camera" : "Other " + a.b + " model") : a.b + " " + shortName(a.m);
     try{
       var old = JSON.parse(localStorage.getItem("acCam") || "{}"); old.i = camInit.value;
       localStorage.setItem("acCam", JSON.stringify(old));
