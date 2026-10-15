@@ -43,6 +43,7 @@ main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:cent
 /* LCD characters drawn in-page: 14-segment style, rounded bars, faint unlit segments; fixed widths so nothing shifts */
 .row svg{display:block; height:1em; width:.635em; margin:0 .05em; overflow:visible}
 .row svg.sep{width:.21em; margin:0}
+.row svg.ms{height:.7em; width:.4445em; margin:0 .035em}
 .row line{stroke:var(--fg); stroke-linecap:round}
 .row line.off{opacity:.06}
 .row circle{fill:var(--fg)}
@@ -376,7 +377,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     function drawn(){
       el.textContent = ""; el.className = "row drawn"; cells = [];
       pattern.split("").forEach(function(ch){
-        if(ch === "#"){ var c = charCell(letters); el.appendChild(c.el); cells.push(c); }
+        if(ch === "#" || ch === "%"){ var c = charCell(letters); if(ch === "%") c.el.setAttribute("class","ms"); el.appendChild(c.el); cells.push(c); }
         else el.appendChild(sepCell(ch));
       });
       last = "";
@@ -392,7 +393,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   }
   var dayR  = makeRow(dayRow,  "###", true);
   var dateR = makeRow(dateRow, "##.##.####");
-  var timeR = makeRow(timeRow, "##:##:##.##");
+  var timeR = makeRow(timeRow, "##:##:##.%%");   // % = hundredths, drawn 30% smaller
   var tzEl = document.getElementById("tz");
   function setDay(s){ dayR.set(s); } function setDate(s){ dateR.set(s); } function setTime(s){ timeR.set(s); }
 
