@@ -111,6 +111,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .checklist .d b{color:var(--fg)}
 .checklist input:checked ~ span .t{color:var(--ok)}
 .sheet-note{margin:0; font-size:.78rem; color:var(--muted); line-height:1.4}
+.resetbtn{align-self:center; font:inherit; font-size:.9rem; font-weight:700; color:var(--bad); background:transparent; border:1.5px solid var(--bad); border-radius:999px; padding:.45rem 1.1rem; cursor:pointer; margin-top:.2rem}
+.resetbtn.armed{background:var(--bad); color:#fff}
+.resetbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .sheet button:focus-visible,.sheet select:focus-visible,.checklist input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 /* Landscape: everything at the bottom on one compact line, so the clock gets the height */
 @media (orientation:landscape){
@@ -182,6 +185,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     <div id="recent" class="recent" aria-label="Recently used cameras"></div>
     <ol id="checklist" class="checklist"></ol>
     <p id="sheetNote" class="sheet-note"></p>
+    <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
   </div>
 </div>
 
@@ -715,6 +719,24 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   // Changing camera type or number also starts a fresh checklist
   camType.addEventListener("change", function(){ renderList(); save(); });
   camNum.addEventListener("change", function(){ renderList(); save(); });
+  // Reset everything to how the app first opens. Needs a second tap within 4 s so it can't happen by accident.
+  var resetBtn = document.getElementById("resetAll"), resetTimer = null;
+  resetBtn.addEventListener("click", function(){
+    if(!resetBtn.classList.contains("armed")){
+      resetBtn.classList.add("armed"); resetBtn.textContent = "Tap again to reset everything";
+      resetTimer = setTimeout(function(){ resetBtn.classList.remove("armed"); resetBtn.textContent = "Reset all to default"; }, 4000);
+      return;
+    }
+    clearTimeout(resetTimer);
+    camInit.value = ""; camType.value = "HAND CAM"; camNum.value = "1";
+    cur = {b:"", m:""}; recent = []; ticks = {sig:"", v:[]};
+    try{ ["acCam","acModel","acRecent","acTicks","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+    brandSel.value = ""; fillModels(); renderRecent(); renderList();
+    updateCam();
+    showLoc = true; applyLoc();
+    resetBtn.classList.remove("armed"); resetBtn.textContent = "Reset done";
+    setTimeout(function(){ resetBtn.textContent = "Reset all to default"; }, 2000);
+  });
   brandSel.value = cur.b; fillModels(); renderRecent(); renderList();
 
   // ================= Keep screen awake =================
