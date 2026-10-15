@@ -1,0 +1,25 @@
+{
+  "name": "SG-Atom-Uhr",
+  "short_name": "Atom-Uhr",
+  "description": "Sydney Time Atomic Clock Web Application",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192.png?text=Uhr",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512.png?text=Uhr",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+ 
