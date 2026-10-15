@@ -470,7 +470,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 
 
   // ================= Camera settings checklist =================
-  // Full frame from 2013, APS-C from 2015.
+  // Full frame from 2013, APS-C from 2015, plus Sony RX100 and Canon 60D (used on LS).
   // Smallest JPEG size whose long edge is at least 4000 px, per body (3:2, full-frame / native image area).
   // Sources: Sony Help Guides, Canon Europe spec pages, Nikon online manuals.
   var CAMS = {
@@ -483,6 +483,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["α7S", "L", "4240×2832", "style"], ["α7S II", "L", "4240×2832", "style"], ["α7S III", "L", "4240×2832", "look"],
       ["α7C", "L", "6000×4000", "style"], ["α7C II", "M", "4608×3072", "look"], ["α7CR", "S", "4752×3168", "look"],
       ["ZV-E1", "L", "4240×2832", "look"], ["α99 II", "M", "5168×3448", "style"],
+      ["RX100 / RX100 II", "L", "5472×3648", "style0"], ["RX100 III / IV / V", "L", "5472×3648", "style"], ["RX100 VA / VI / VII", "L", "5472×3648", "style"],
       ["α6100 (APS-C)", "M", "4240×2832", "style"], ["α6300 (APS-C)", "M", "4240×2832", "style"], ["α6400 (APS-C)", "M", "4240×2832", "style"],
       ["α6500 (APS-C)", "M", "4240×2832", "style"], ["α6600 (APS-C)", "M", "4240×2832", "style"], ["α6700 (APS-C)", "M", "4384×2920", "look"],
       ["ZV-E10 (APS-C)", "M", "4240×2832", "style"], ["ZV-E10 II (APS-C)", "M", "4384×2920", "look"]
@@ -496,7 +497,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       ["EOS-1D X Mark II", "M1", "4368×2912"], ["EOS-1D X Mark III", "M1", "4368×2912"],
       ["EOS 5DS / 5DS R", "S1", "4320×2880"], ["EOS 5D Mark IV", "M", "4464×2976"], ["EOS 6D Mark II", "M", "4160×2768"],
       ["EOS R7 (APS-C)", "M", "4800×3200"], ["EOS R10 (APS-C)", "L", "6000×4000"], ["EOS R50 (APS-C)", "L", "6000×4000"], ["EOS R100 (APS-C)", "L", "6000×4000"],
-      ["EOS 90D (APS-C)", "M", "4800×3200"], ["EOS 80D (APS-C)", "L", "6000×4000"], ["EOS 77D (APS-C)", "L", "6000×4000"],
+      ["EOS 90D (APS-C)", "M", "4800×3200"], ["EOS 80D (APS-C)", "L", "6000×4000"], ["EOS 60D (APS-C)", "L", "5184×3456"], ["EOS 77D (APS-C)", "L", "6000×4000"],
       ["EOS 850D / T8i (APS-C)", "L", "6000×4000"], ["EOS 800D / T7i (APS-C)", "L", "6000×4000"], ["EOS 760D / T6s (APS-C)", "L", "6000×4000"],
       ["EOS 750D / T6i (APS-C)", "L", "6000×4000"], ["EOS 250D / SL3 (APS-C)", "L", "6000×4000"], ["EOS 200D / SL2 (APS-C)", "L", "6000×4000"],
       ["EOS M6 Mark II (APS-C)", "M", "4800×3200"], ["EOS M6 (APS-C)", "L", "6000×4000"], ["EOS M5 (APS-C)", "L", "6000×4000"],
@@ -527,10 +528,38 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     ]
   };
   // White balance menus differ by model (checked against each maker's manuals)
-  var SONY_NO_AWB_PRIORITY = ["α7", "α7 II", "α7R", "α7R II", "α7S", "α7S II", "α6300 (APS-C)"];
+  var SONY_NO_AWB_PRIORITY = ["α7", "α7 II", "α7R", "α7R II", "α7S", "α7S II", "α6300 (APS-C)", "RX100 / RX100 II", "RX100 III / IV / V"];
+  var CANON_NO_AWBW = ["EOS 60D (APS-C)", "EOS 750D / T6i (APS-C)", "EOS 760D / T6s (APS-C)"];
   var NIKON_PLAIN_AUTO = ["D5600 (APS-C)", "D5500 (APS-C)", "D3500 (APS-C)", "D3400 (APS-C)"];
   var NIKON_AUTO_NORMAL = ["D5", "D500 (APS-C)", "D850", "D7500 (APS-C)", "D7200 (APS-C)", "D810", "D750", "D610", "D4S", "Df"];
   var FUJI_AUTO_PRIORITY = ["X-H2", "X-H2S", "X-T5", "X-T4", "X-T50", "X-T30 III", "X-T30 II", "X-S20", "X-S10", "X-M5", "X-E5", "X-E4"];
+
+  var YEARS = {
+    "α1":"2021","α1 II":"2024","α9":"2017","α9 II":"2019","α9 III":"2023",
+    "α7":"2013","α7 II":"2014","α7 III":"2018","α7 IV":"2021","α7 V":"2025",
+    "α7R":"2013","α7R II":"2015","α7R III / IIIA":"2017","α7R IV / IVA":"2019","α7R V":"2022",
+    "α7S":"2014","α7S II":"2015","α7S III":"2020","α7C":"2020","α7C II":"2023","α7CR":"2023","ZV-E1":"2023","α99 II":"2016",
+    "RX100 / RX100 II":"2012–13","RX100 III / IV / V":"2014–16","RX100 VA / VI / VII":"2018–19",
+    "α6100 (APS-C)":"2019","α6300 (APS-C)":"2016","α6400 (APS-C)":"2019","α6500 (APS-C)":"2016","α6600 (APS-C)":"2019","α6700 (APS-C)":"2023",
+    "ZV-E10 (APS-C)":"2021","ZV-E10 II (APS-C)":"2024",
+    "EOS R1":"2024","EOS R3":"2021","EOS R5":"2020","EOS R5 Mark II":"2024","EOS R6":"2020","EOS R6 Mark II":"2022","EOS R6 Mark III":"2025","EOS R6 V":"2026",
+    "EOS R8":"2023","EOS R8 Mark II":"2026","EOS R":"2018","EOS RP":"2019","EOS-1D X Mark II":"2016","EOS-1D X Mark III":"2020",
+    "EOS 5DS / 5DS R":"2015","EOS 5D Mark IV":"2016","EOS 6D Mark II":"2017",
+    "EOS R7 (APS-C)":"2022","EOS R10 (APS-C)":"2022","EOS R50 (APS-C)":"2023","EOS R100 (APS-C)":"2023",
+    "EOS 90D (APS-C)":"2019","EOS 80D (APS-C)":"2016","EOS 60D (APS-C)":"2010","EOS 77D (APS-C)":"2017",
+    "EOS 850D / T8i (APS-C)":"2020","EOS 800D / T7i (APS-C)":"2017","EOS 760D / T6s (APS-C)":"2015","EOS 750D / T6i (APS-C)":"2015",
+    "EOS 250D / SL3 (APS-C)":"2019","EOS 200D / SL2 (APS-C)":"2017","EOS M6 Mark II (APS-C)":"2019","EOS M6 (APS-C)":"2017","EOS M5 (APS-C)":"2016",
+    "EOS M50 / M50 Mark II (APS-C)":"2018–20",
+    "Z9":"2021","Z8":"2023","Z7 / Z7II":"2018–20","Z6 / Z6II":"2018–20","Z6III":"2024","Zf":"2023","Z5":"2020","Z5II":"2025",
+    "D6":"2020","D5":"2016","D850":"2017","D780":"2020","D810":"2014","D750":"2014","D610":"2013","D4S":"2014","Df":"2013",
+    "Z50 / Z50II (APS-C)":"2019–24","Z fc (APS-C)":"2021","Z30 (APS-C)":"2022","D500 (APS-C)":"2016","D7500 (APS-C)":"2017","D7200 (APS-C)":"2015",
+    "D5600 (APS-C)":"2016","D5500 (APS-C)":"2015","D3500 (APS-C)":"2018","D3400 (APS-C)":"2016",
+    "X-H2":"2022","X-H2S":"2022","X-H1":"2018","X-T5":"2022","X-T4":"2020","X-T3":"2018","X-T2":"2016","X-T50":"2024","X-T30 III":"2025",
+    "X-T30 II":"2021","X-T30":"2019","X-T20":"2017","X-T10":"2015","X-Pro3":"2019","X-Pro2":"2016","X-S20":"2023","X-S10":"2020","X-M5":"2024",
+    "X-E5":"2025","X-E4":"2021","X-E3":"2017"
+  };
+  function yearOf(m){ return YEARS[m] || ""; }
+  function newest(a, b){ return (parseInt(yearOf(b[0]).slice(-4),10) || 0) - (parseInt(yearOf(a[0]).slice(-4),10) || 0); }
   function has(list, m){ return list.indexOf(m) > -1; }
   function findCam(b, m){ var list = CAMS[b] || []; for(var i=0;i<list.length;i++) if(list[i][0] === m) return list[i]; return null; }
 
@@ -539,14 +568,15 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     var size = c[1], px = c[2];
     if(b === "Sony") return [
       ["White balance", has(SONY_NO_AWB_PRIORITY, c[0]) ? "<b>AWB</b> (Auto)" : "<b>AWB</b>, Priority Set in AWB → <b>Standard</b>"],
-      [c[3] === "style" ? "Creative Style" : "Creative Look",
+      [c[3] === "style" || c[3] === "style0" ? "Creative Style" : "Creative Look",
+        c[3] === "style0" ? "<b>Standard</b> (this model has no Neutral)" :
         c[3] === "style" ? "<b>Neutral (NT)</b>" :
         c[3] === "look1" ? "<b>NT (Neutral)</b> · on firmware before 2.0: Creative Style → Neutral" : "<b>NT (Neutral)</b>"],
-      ["JPEG quality", c[3] === "style" ? "Quality <b>Standard</b> (JPEG only, not RAW or RAW & JPEG)" : "File Format <b>JPEG</b> (RAW off), JPEG Quality <b>Standard</b>"],
+      ["JPEG quality", c[3] === "style" || c[3] === "style0" ? "Quality <b>Standard</b> (JPEG only, not RAW or RAW & JPEG)" : "File Format <b>JPEG</b> (RAW off), JPEG Quality <b>Standard</b>"],
       ["Image size", "JPEG Image Size <b>" + size + "</b> · " + px + " px"]
     ];
     if(b === "Canon") return [
-      ["White balance", "<b>AWB</b> — regular Auto (Ambience priority), not AWB W"],
+      ["White balance", has(CANON_NO_AWBW, c[0]) ? "<b>AWB</b> (Auto)" : "<b>AWB</b> — regular Auto (Ambience priority), not AWB W"],
       ["Picture Style", "<b>Neutral (N)</b>"],
       ["JPEG quality", "JPEG only (RAW off) with the <b>staircase</b> icon. If there's a JPEG quality 1–10 setting: <b>6</b>, the first staircase step down from 10"],
       ["Image size", "Image quality <b>" + size + "</b> (staircase) · " + px + " px"]
@@ -588,7 +618,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   function fillModels(){
     modelSel.textContent = "";
     var first = document.createElement("option"); first.value = ""; first.textContent = "Model…"; modelSel.appendChild(first);
-    (CAMS[cur.b] || []).forEach(function(c){ var o = document.createElement("option"); o.textContent = c[0]; modelSel.appendChild(o); });
+    (CAMS[cur.b] || []).slice().sort(newest).forEach(function(c){
+      var o = document.createElement("option"); o.value = c[0]; o.textContent = c[0] + (yearOf(c[0]) ? "  ·  " + yearOf(c[0]) : ""); modelSel.appendChild(o);
+    });
     modelSel.disabled = !cur.b; modelSel.value = cur.m || "";
   }
   function renderRecent(){
