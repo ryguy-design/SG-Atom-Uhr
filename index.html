@@ -1013,11 +1013,23 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   });
   var rotBtn = document.getElementById("rotBtn");
   rotBtn.setAttribute("aria-pressed", rotated ? "true" : "false");
-  rotBtn.addEventListener("click", function(){
-    rotated = !rotated; rotBtn.setAttribute("aria-pressed", rotated ? "true" : "false");
-    try{ localStorage.setItem("acRot", rotated ? "1" : "0"); }catch(e){}
+  function setRot(on){
+    rotated = on; rotBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    try{ localStorage.setItem("acRot", on ? "1" : "0"); }catch(e){}
     fit();
-  });
+  }
+  rotBtn.addEventListener("click", function(){ setRot(!rotated); });
+  // Phone turned to landscape by itself (auto-rotate): switch the button off so the two don't add up.
+  // Uses the screen's orientation, not the window size, so the keyboard opening can't trigger it.
+  function phoneLandscape(){
+    if(screen.orientation && screen.orientation.type) return screen.orientation.type.indexOf("landscape") === 0;
+    if(typeof window.orientation === "number") return Math.abs(window.orientation) === 90;
+    return false;
+  }
+  function autoRotCheck(){ if(rotated && phoneLandscape()) setRot(false); }
+  if(screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener("change", autoRotCheck);
+  window.addEventListener("orientationchange", function(){ setTimeout(autoRotCheck, 100); });
+  autoRotCheck();
   // In photo mode a tap anywhere else (e.g. the bottom edge) brings the buttons back too
   document.body.addEventListener("click", function(e){
     if(document.body.classList.contains("photo") && !mainEl.contains(e.target) && !nextBar.contains(e.target)){ document.body.classList.remove("photo"); fit(); }
