@@ -419,9 +419,12 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   try{ rotated = localStorage.getItem("acRot") === "1"; }catch(e){}
   function layout(){
     var html = document.documentElement, W = window.innerWidth, H = window.innerHeight;
-    html.classList.toggle("rot", rotated);
+    // The keyboard and dropdown menus belong to the phone and can't be turned,
+    // so the camera check sheet always opens upright; rotation comes back when it closes
+    var sh = document.getElementById("sheet"), rot = rotated && (!sh || sh.hidden);
+    html.classList.toggle("rot", rot);
     html.style.setProperty("--rw", H + "px"); html.style.setProperty("--rh", W + "px");
-    var w = rotated ? H : W, h = rotated ? W : H;
+    var w = rot ? H : W, h = rot ? W : H;
     html.classList.toggle("land", w > h); html.classList.toggle("narrow", w <= 420);
     return {w:w, h:h};
   }
@@ -967,8 +970,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   // Tap anywhere outside the banner to hide it sooner
   document.addEventListener("pointerdown", function(e){ if(!nextBar.hidden && !nextBar.contains(e.target)) hideNext(); }, true);
 
-  function openSheet(){ hideNext(); sheet.hidden = false; document.getElementById("sheetClose").focus(); }
-  function closeSheet(){ sheet.hidden = true; var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
+  function openSheet(){ hideNext(); sheet.hidden = false; if(rotated) fit(); document.getElementById("sheetClose").focus(); }
+  function closeSheet(){ sheet.hidden = true; if(rotated) fit(); var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
   document.getElementById("sheetClose").addEventListener("click", closeSheet);
   sheet.addEventListener("click", function(e){ if(e.target === sheet) closeSheet(); });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !sheet.hidden) closeSheet(); });
