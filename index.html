@@ -160,8 +160,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .nb-msg b{color:var(--ok); font-size:1rem}
 .nb-msg span{font-size:.85rem; color:#cfe9d6}
 .nb-next{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:#06210e; background:var(--ok); border:0; border-radius:10px; padding:.6rem 1rem; cursor:pointer}
-.nb-close{flex-shrink:0; font:inherit; font-size:1.1rem; color:var(--fg); background:none; border:0; padding:.3rem .4rem; cursor:pointer}
-.nb-next:focus-visible,.nb-close:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.nb-next:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .resetbtn{align-self:center; font:inherit; font-size:.9rem; font-weight:700; color:var(--bad); background:transparent; border:1.5px solid var(--bad); border-radius:999px; padding:.45rem 1.1rem; cursor:pointer; margin-top:.2rem}
 .resetbtn.armed{background:var(--bad); color:#fff}
 .resetbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
@@ -252,7 +251,6 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 <div id="nextBar" class="nextbar" hidden role="status">
   <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span></div>
   <button id="nbNext" class="nb-next" type="button"></button>
-  <button id="nbClose" class="nb-close" type="button" aria-label="Close">✕</button>
 </div>
 
 <script>
@@ -908,23 +906,23 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && !isDone(c)) return c; }
     return null;
   }
-  var nextTarget = null, nextTimer = null, nbClose = document.getElementById("nbClose");
+  var nextTarget = null, nextTimer = null;
   function showNext(a){
     nextTarget = nextAfter(a);
     nbTitle.textContent = "✓ " + key(a) + " ready";
     nbSub.textContent = nextTarget ? "Photograph the clock now, then go to the next camera." : "Photograph the clock now. That's every camera done.";
     nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : "OK";
-    nbClose.hidden = !nextTarget;            // last camera: just an OK button
     nextBar.hidden = false;
-    // Sits for 7 seconds, then gets out of the way of the clock
-    clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 7000);
+    // Sits for 10 seconds, then gets out of the way of the clock
+    clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 10000);
   }
   function hideNext(){ clearTimeout(nextTimer); nextBar.hidden = true; }
   nbNext.addEventListener("click", function(){
     hideNext();
     if(nextTarget){ setActive(key(nextTarget)); openSheet(); }
   });
-  nbClose.addEventListener("click", hideNext);
+  // Tap anywhere outside the banner to hide it sooner
+  document.addEventListener("pointerdown", function(e){ if(!nextBar.hidden && !nextBar.contains(e.target)) hideNext(); }, true);
 
   function openSheet(){ hideNext(); sheet.hidden = false; document.getElementById("sheetClose").focus(); }
   function closeSheet(){ sheet.hidden = true; var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
