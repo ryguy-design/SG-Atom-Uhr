@@ -175,12 +175,20 @@ body.photo .showhint{display:block}
 .nb-msg span{font-size:.85rem; color:#cfe9d6}
 .nb-next{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:#06210e; background:var(--ok); border:0; border-radius:10px; padding:.6rem 1rem; cursor:pointer}
 .nb-next:focus-visible,.nb-photo:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
-.nb-photo{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:var(--fg); background:transparent; border:2px solid var(--ok); border-radius:10px; padding:.5rem .8rem; cursor:pointer; white-space:nowrap}
-.nb-photo.done{border-color:#3a6b47; color:#cfe9d6; font-weight:700}
-.nb-links{display:flex; gap:1rem; margin-top:.3rem}
-.nb-link{font:inherit; font-size:.8rem; color:#cfe9d6; background:none; border:0; padding:.15rem 0; text-decoration:underline; text-underline-offset:3px; cursor:pointer}
-.nb-link.armed{color:#fff; background:var(--bad); border-radius:6px; padding:.15rem .5rem; text-decoration:none}
-.nb-link:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.nb-photo{flex-shrink:0; font:inherit; font-size:1.25rem; line-height:1; color:var(--fg); background:transparent; border:2px solid var(--ok); border-radius:10px; padding:.4rem .7rem; cursor:pointer; position:relative}
+.nb-photo.done::after{content:"✓"; position:absolute; top:-.45rem; right:-.45rem; font-size:.7rem; font-weight:900; color:#06210e; background:var(--ok); border-radius:50%; width:1.1rem; height:1.1rem; line-height:1.1rem; text-align:center}
+.nextbar{flex-wrap:wrap; row-gap:.6rem}
+.nb-msg{flex:1 1 100%}
+.nb-btns{flex:1 1 100%; display:flex; gap:.5rem; align-items:stretch}
+.nb-btns .nb-next{margin-left:auto}
+html.narrow .nb-btns{gap:.4rem; flex-wrap:wrap}
+html.narrow .nb-btn{font-size:.88rem; padding:.45rem .55rem}
+html.narrow .nb-photo{padding:.35rem .55rem}
+html.narrow .nb-next{font-size:.92rem; padding:.5rem .7rem}
+.nb-btn{flex-shrink:0; font:inherit; font-weight:700; font-size:.95rem; color:var(--fg); background:transparent; border:2px solid #3a6b47; border-radius:10px; padding:.5rem .75rem; cursor:pointer; white-space:nowrap}
+.nb-btn.clear{border-color:#7a3a3b; color:#f3b5b6}
+.nb-btn.clear.armed{background:var(--bad); border-color:var(--bad); color:#fff}
+.nb-btn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .photorow{display:flex; align-items:center; gap:.6rem; background:#1d252a; border-radius:10px; padding:.5rem .6rem}
 .photorow[hidden]{display:none}
 .photorow img{width:3.2rem; height:3.2rem; object-fit:cover; border-radius:6px; flex-shrink:0}
@@ -282,10 +290,13 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </div>
 
 <div id="nextBar" class="nextbar" hidden role="status">
-  <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span>
-    <span class="nb-links"><button id="nbBack" class="nb-link" type="button">↩ Back to check</button><button id="nbClear" class="nb-link" type="button">Start over</button></span></div>
-  <button id="nbPhoto" class="nb-photo" type="button"></button>
-  <button id="nbNext" class="nb-next" type="button"></button>
+  <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span></div>
+  <div class="nb-btns">
+    <button id="nbBack" class="nb-btn" type="button">↩ Back</button>
+    <button id="nbClear" class="nb-btn clear" type="button">Start over</button>
+    <button id="nbPhoto" class="nb-photo" type="button" aria-label="Photo of the camera back">📷</button>
+    <button id="nbNext" class="nb-next" type="button"></button>
+  </div>
   <input id="photoIn" type="file" accept="image/*" capture="environment" hidden>
 </div>
 
@@ -981,9 +992,9 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     nextTarget = nextAfter(a); bannerCam = a;
     var got = !!photos[photoKey(a)], n = photoCount();
     nbTitle.textContent = "✓ " + key(a) + " ready";
-    nbSub.textContent = !got ? "Shoot the clock, then take a photo of the camera's screen." :
+    nbSub.textContent = !got ? "Shoot the clock, then 📷 the camera's screen." :
       nextTarget ? "Back-of-camera photo saved." : "Every camera done. Send the photos to the group.";
-    nbPhoto.textContent = got ? "📷 Retake" : "📷 Camera back";
+    nbPhoto.setAttribute("aria-label", got ? "Retake photo of the camera back" : "Photo of the camera back");
     nbPhoto.classList.toggle("done", got);
     nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : n ? "Send " + n + " photo" + (n > 1 ? "s" : "") : "OK";
     nextBar.hidden = false;
@@ -1098,7 +1109,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   }
   // Step back from the banner: reopen this camera's check (untick there), or clear everything
   document.getElementById("nbBack").addEventListener("click", function(){ var c = bannerCam; hideNext(); if(c){ setActive(key(c)); openSheet(); } });
-  twoTap(document.getElementById("nbClear"), "Start over", "Tap again: clear all", function(){
+  twoTap(document.getElementById("nbClear"), "Start over", "Sure?", function(){
     ev = {day: today(), ticks: {}}; save(); dbClear(); hideNext(); refresh();
   });
   document.getElementById("nbClear").addEventListener("click", function(){ clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 10000); });
