@@ -1060,7 +1060,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     // "+" on the main screen: tap to choose Hand cam or LS, then that camera's setup opens
     if(hc < MAXN || ls < MAXN){
       if(!addOpen){
-        stripEl.appendChild(addChip("+", "plus", function(){ addOpen = true; renderStrips(); var e = stripEl.lastChild; if(e && e.scrollIntoView) e.scrollIntoView({inline:"end", block:"nearest"}); }));
+        stripEl.appendChild(addChip("+ 📸", "plus", function(){ addOpen = true; renderStrips(); var e = stripEl.lastChild; if(e && e.scrollIntoView) e.scrollIntoView({inline:"end", block:"nearest"}); }));
       } else {
         stripEl.appendChild(addChip("+ Hand cam", "plusopt", function(){ addOpen = false; addFirst("HAND CAM"); }, hc >= MAXN));
         stripEl.appendChild(addChip("+ LS", "plusopt", function(){ addOpen = false; addFirst("LS"); }, ls >= MAXN));
