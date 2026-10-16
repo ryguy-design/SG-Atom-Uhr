@@ -318,7 +318,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   <div class="controls">
     <button id="initBtn" class="initbtn" type="button" aria-label="Edit your initials"></button>
     <button id="resync" type="button">Sync now</button>
-    <button id="clearMain" class="clearmain" type="button">Clear all</button>
+    <button id="clearMain" class="clearmain" type="button">Reset app</button>
     <label class="switch" for="locToggle">
       <span>Location</span>
       <input id="locToggle" type="checkbox" role="switch" aria-controls="place">
@@ -1601,13 +1601,18 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function clearAll(){ shotClock = {}; skipped = {}; at = {}; ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
   twoTap(document.getElementById("newEvent"), "Clear all cameras", "Tap again to clear every camera", clearAll);
   // Same, from the main screen next to Sync now (ticks and photos of every camera; cameras and initials stay)
-  twoTap(document.getElementById("clearMain"), "Clear all", "Sure?", clearAll);
-  twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", function(){
-    try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+  twoTap(document.getElementById("clearMain"), "Reset app", "Sure? Resets everything", resetApp);
+  // Reset the whole app to a fresh start: no cameras, no initials, no ticks or photos, location off, not rotated
+  function resetApp(){
+    try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc","acRot"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
     camInit.value = ""; updateInitBtn(); kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = []; dbClear();
+    shotClock = {}; skipped = {}; at = {};
     save(); hideNext(); refresh();
     showLoc = false; applyLoc();
-  });
+    if(rotated) setRot(false);
+    document.body.classList.remove("photo"); fit();
+  }
+  twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", resetApp);
 
   // A new day starts a new event: re-check whenever the app comes back to the screen
   function dayCheck(){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); hideNext(); dbClear(); refresh(); } }
