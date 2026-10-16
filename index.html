@@ -36,10 +36,8 @@ main{flex:1; min-height:0; display:flex; flex-direction:column; align-items:cent
 .daydate{display:flex; flex-direction:column; align-items:center; gap:calc(var(--u)*.2); font-size:calc(var(--u)*.78)}
 .daydate .row{font-size:1em}
 /* Landscape: day and date share one line so the time can grow to fill the width */
-@media (orientation:landscape){
-  .daydate{flex-direction:row; gap:.7em; font-size:calc(var(--u)*.5)}
-  main{gap:calc(var(--u)*.16)}
-}
+html.land .daydate{flex-direction:row; gap:.7em; font-size:calc(var(--u)*.5)}
+html.land main{gap:calc(var(--u)*.16)}
 /* LCD characters drawn in-page: 14-segment style, rounded bars, faint unlit segments; fixed widths so nothing shifts */
 .row svg{display:block; height:1em; width:.635em; margin:0 .05em; overflow:visible}
 .row svg.sep{width:.21em; margin:0}
@@ -68,6 +66,15 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .camwrap{display:flex; flex-direction:column; align-items:center; gap:calc(var(--u)*.07)}
 .cammodel{font-family:var(--sans); font-weight:600; font-size:calc(var(--u)*.2); letter-spacing:.04em; color:var(--muted); white-space:nowrap}
 .cammodel:empty{display:none}
+/* The checked settings, so the sync photo also proves how the camera was set */
+.camset{font-family:var(--sans); font-weight:700; font-size:calc(var(--u)*.17); letter-spacing:.03em; white-space:nowrap; color:var(--bad)}
+.camset.ok{color:var(--ok)}
+/* Photo mode: tap the clock to hide everything else */
+main{cursor:pointer}
+.taphint{font-size:.72rem; color:var(--muted); opacity:.55; text-align:center; margin:0 0 .45rem}
+.showhint{display:none; position:fixed; left:0; right:0; bottom:max(14px,env(safe-area-inset-bottom,0px)); font-size:.72rem; color:var(--muted); opacity:.45; text-align:center; pointer-events:none}
+body.photo footer, body.photo .taphint{display:none}
+body.photo .showhint{display:block}
 #status{display:flex; flex-direction:column; gap:.15rem; min-width:0}
 #syncText{color:var(--muted)}
 .ok #syncText{color:var(--ok)}
@@ -166,18 +173,16 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .resetbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .sheet button:focus-visible,.sheet select:focus-visible,.checklist input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 /* Landscape: everything at the bottom on one compact line, so the clock gets the height */
-@media (orientation:landscape){
-  footer{flex-wrap:nowrap; align-items:center; gap:.9rem}
-  .setbtn{width:auto; flex-shrink:0; font-size:.95rem; padding:.4rem .85rem; border-radius:10px}
-  .setbtn b{font-size:1rem}
-  .cam{width:auto; flex:1 1 auto; min-width:0; max-width:55%}
-  .cam select,.cam input{padding:.35rem .5rem}
-  .cam input{width:6.5rem}
-  #status{flex:1; min-width:0}
-  #syncText{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-  #detail{display:none}
-}
-@media (max-width:420px){ footer{flex-direction:column; align-items:center; text-align:center} #status{align-items:center} }
+html.land footer{flex-wrap:nowrap; align-items:center; gap:.9rem}
+html.land .cam{width:auto; flex:1 1 auto; min-width:0; max-width:55%}
+html.land #status{flex:1; min-width:0}
+html.land #syncText{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+html.land #detail{display:none}
+html.narrow footer{flex-direction:column; align-items:center; text-align:center}
+html.narrow #status{align-items:center}
+/* Rotate button: turns the whole app 90°, works even with the phone's rotation lock on */
+html.rot{overflow:hidden}
+html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); transform-origin:0 0; transform:translateX(var(--rh)) rotate(90deg)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -187,6 +192,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   <div class="camwrap">
     <div id="camLabel" class="camlabel" aria-label="Camera"></div>
     <div id="camModel" class="cammodel" aria-label="Camera model"></div>
+    <div id="camSet" class="camset" aria-label="Camera settings"></div>
   </div>
   <div class="daydate">
     <div class="row" id="dayRow" aria-label="Day"></div>
@@ -197,6 +203,8 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   <div id="place"><b id="suburb">Finding you…</b> <span id="coords"></span><div class="locwarn">⚠️ Exact GPS location visible on screen ⚠️</div></div>
 </main>
 
+<div id="tapHint" class="taphint">Tap the clock to hide the buttons</div>
+<div id="showHint" class="showhint">Tap to show buttons</div>
 <footer>
   <div class="cam">
     <div id="strip" class="strip main" aria-label="My cameras: tap to open its camera check"></div>
@@ -207,6 +215,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   </div>
   <div class="controls">
     <button id="resync" type="button">Sync now</button>
+    <button id="rotBtn" type="button" aria-pressed="false">Rotate</button>
     <label class="switch" for="locToggle">
       <span>Location</span>
       <input id="locToggle" type="checkbox" role="switch" aria-controls="place">
@@ -396,7 +405,19 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   function setDay(s){ dayR.set(s); } function setDate(s){ dateR.set(s); } function setTime(s){ timeR.set(s); }
 
   // Scale everything so the display fills the screen (width or height, whichever runs out first)
+  // Effective screen size: swapped when the Rotate button has turned the app
+  var rotated = false;
+  try{ rotated = localStorage.getItem("acRot") === "1"; }catch(e){}
+  function layout(){
+    var html = document.documentElement, W = window.innerWidth, H = window.innerHeight;
+    html.classList.toggle("rot", rotated);
+    html.style.setProperty("--rw", H + "px"); html.style.setProperty("--rh", W + "px");
+    var w = rotated ? H : W, h = rotated ? W : H;
+    html.classList.toggle("land", w > h); html.classList.toggle("narrow", w <= 420);
+    return {w:w, h:h};
+  }
   function fit(){
+    var scr = layout();
     var root = document.documentElement;
     root.style.setProperty("--u","100px"); root.style.setProperty("--labk","1"); camLabelEl.style.fontSize = "";
     // Label size is fixed: set by the longest possible label (6 initials + HAND CAM),
@@ -413,9 +434,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     var gap = parseFloat(getComputedStyle(mainEl).rowGap) || 20;
     var placeH = placeEl.offsetHeight;
     var modelEl = document.getElementById("camModel");
-    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + gap*3 + (modelEl.textContent ? modelEl.offsetHeight + gap*0.35 : 0);
+    var rest = daydate.offsetHeight + timeRow.offsetHeight + tzEl.offsetHeight + gap*3 + (modelEl.textContent ? modelEl.offsetHeight + gap*0.35 : 0) + document.getElementById("camSet").offsetHeight + gap*0.35;
     var availW = mainEl.clientWidth*0.985, availH = mainEl.clientHeight*0.97 - placeH;
-    var portrait = window.innerHeight >= window.innerWidth, scale;
+    var portrait = scr.h >= scr.w, scale;
     if(portrait){
       // Camera label scales with the clock; the longest label would be exactly as wide as the time
       var k = tw / lw;
@@ -423,7 +444,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
       scale = Math.min(availW / w, availH / (rest + lh*k + gap));
     } else {
       // Landscape: label keeps its phone-width (portrait) size and doesn't grow
-      var shortSide = Math.min(window.innerWidth, window.innerHeight);
+      var shortSide = Math.min(scr.w, scr.h);
       var labelPx = Math.min(100, (shortSide - 32) * 0.94 * 100 / lw);
       camLabelEl.style.fontSize = labelPx.toFixed(1) + "px";
       var labelH = lh * labelPx / 100 + gap;
@@ -529,6 +550,9 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     camLabelEl.textContent = parts.join(" · ");
     document.getElementById("camModel").textContent =
       !findCam(a.b, a.m) ? "" : a.m === OTHER ? (a.b === "Other" ? "Other camera" : "Other " + a.b + " model") : a.b + " " + shortName(a.m);
+    var setEl = document.getElementById("camSet"), cc = findCam(a.b, a.m), n = countOf(a);
+    setEl.textContent = n === 4 ? "✓ " + summary(a.b, cc) : "CAMERA CHECK " + n + "/4 — NOT DONE";
+    setEl.className = "camset" + (n === 4 ? " ok" : "");
     try{
       var old = JSON.parse(localStorage.getItem("acCam") || "{}"); old.i = camInit.value;
       localStorage.setItem("acCam", JSON.stringify(old));
@@ -728,6 +752,16 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     ];
   }
 
+  // One short line of the four settings, shown on the clock once all are ticked
+  function summary(b, c){
+    var size = c[1], px = c[2];
+    if(c[0] === OTHER) return "Auto WB · Neutral · JPEG standard · ≥4000 px";
+    if(b === "Sony") return "AWB · " + (c[3] === "style0" ? "Standard" : "NT") + " · JPEG Std · " + size + " " + px;
+    if(b === "Canon") return "AWB · Neutral · JPEG staircase · " + size + " " + px;
+    if(b === "Fujifilm") return "AUTO · PROVIA · NORMAL · " + size + " " + px;
+    return (has(NIKON_PLAIN_AUTO, c[0]) ? "Auto" : "AUTO1") + " · NL · JPEG normal · " + c[3] + " " + size.charAt(0) + " " + px;
+  }
+
   var sheet = document.getElementById("sheet");
   var brandSel = document.getElementById("brand"), modelSel = document.getElementById("model");
   var recentEl = document.getElementById("recent"), listEl = document.getElementById("checklist"), noteEl = document.getElementById("sheetNote");
@@ -861,7 +895,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks start fresh each new day or with New event.";
     updateCount();
   }
-  function updateCount(){}
+  function updateCount(){ updateCam(); }
   function choose(b, m){
     var a = act(); a.b = b; a.m = m;
     if(b && m && findCam(b, m)) recent = [{b:b, m:m}].concat(recent.filter(function(r){ return !(r.b === b && r.m === m); })).slice(0, 6);
@@ -958,6 +992,24 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") dayCheck(); });
   setInterval(dayCheck, 60*1000);   // also clears at midnight while the app stays open
   refresh();
+
+  // ================= Photo mode: tap the clock to hide the buttons =================
+  mainEl.addEventListener("click", function(){ document.body.classList.toggle("photo"); fit(); });
+  // In photo mode a tap anywhere else (e.g. the bottom edge) brings the buttons back too
+  document.body.addEventListener("click", function(e){
+    if(document.body.classList.contains("photo") && !mainEl.contains(e.target) && !nextBar.contains(e.target)){ document.body.classList.remove("photo"); fit(); }
+  });
+  var rotBtn = document.getElementById("rotBtn");
+  rotBtn.setAttribute("aria-pressed", rotated ? "true" : "false");
+  rotBtn.addEventListener("click", function(){
+    rotated = !rotated; rotBtn.setAttribute("aria-pressed", rotated ? "true" : "false");
+    try{ localStorage.setItem("acRot", rotated ? "1" : "0"); }catch(e){}
+    fit();
+  });
+  // In photo mode a tap anywhere else (e.g. the bottom edge) brings the buttons back too
+  document.body.addEventListener("click", function(e){
+    if(document.body.classList.contains("photo") && !mainEl.contains(e.target) && !nextBar.contains(e.target)){ document.body.classList.remove("photo"); fit(); }
+  });
 
   // ================= Keep screen awake =================
   // Asked for on open, again whenever the app comes back, and on any tap
