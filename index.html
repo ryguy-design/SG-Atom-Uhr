@@ -1105,21 +1105,32 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var t = nextTarget; if(!t) return;
     setActive(key(t)); if(isDone(t)) showNext(t); else { hideNext(); openSheet(); }
   }
+  // Which step a camera is on: 1 shoot the clock, 2 photo, (3 = review screen), 4 done.
+  // "at" remembers where you stepped back to; nothing is thrown away by going back.
+  var at = {};
+  function stepOf(c){ var k = photoKey(c); return at[k] || (photos[k] || skipped[k] ? 4 : shotClock[k] ? 2 : 1); }
+  function go(c, n){ var k = photoKey(c); if(n === 4) delete at[k]; else at[k] = n; showNext(c); }
   function showNext(a){
-    bannerCam = a; var k = photoKey(a), rec = photos[k], name = key(a);
-    if(!rec && !skipped[k] && !shotClock[k]){
-      // Step 1: shoot the clock with the camera
+    bannerCam = a; var k = photoKey(a), rec = photos[k], name = key(a), st = stepOf(a);
+    if(st === 1){
       panel({step: 0, kick: name + " · step 1 of 3", head: "Shoot the clock with your camera", sub: "Point " + name + " at this screen and take a shot.",
-        go: ["Done, I shot it →", function(){ shotClock[k] = true; showNext(a); }],
-        l: ["↩ Back to checks", function(){ hideNext(); setActive(key(a)); openSheet(); }]});
+        go: ["Done, I shot it →", function(){ shotClock[k] = true; go(a, 2); }],
+        l: ["← Camera check", function(){ hideNext(); setActive(key(a)); openSheet(); }],
+        r: rec || skipped[k] ? ["Skip ahead →", function(){ go(a, 4); }] : null});
       return;
     }
-    if(!rec && !skipped[k]){
-      // Step 2: photo of the camera's screen
-      panel({step: 1, kick: name + " · step 2 of 3", head: "Photograph the camera's screen", sub: "Show the shot of the clock and the camera's time. You'll check it next.",
-        go: ["📷 Take photo", function(){ bannerCam = a; takePhoto(); }],
-        l: ["↩ Back", function(){ delete shotClock[k]; showNext(a); }],
-        r: ["Skip photo", function(){ skipped[k] = true; showNext(a); }]});
+    if(st === 2){
+      if(rec){
+        // Came back here with a photo already taken: keep it (check it again) or retake
+        panel({step: 1, kick: name + " · step 2 of 3", head: "Photo of the camera's screen", thumb: rec, thumbText: "Your photo · tap to view",
+          go: ["Check this photo →", function(){ reviewSaved(a); }],
+          l: ["← Back", function(){ go(a, 1); }], r: ["📷 Retake", function(){ bannerCam = a; takePhoto(); }]});
+      } else {
+        panel({step: 1, kick: name + " · step 2 of 3", head: "Photograph the camera's screen", sub: "Show the shot of the clock and the camera's time. You'll check it next.",
+          go: ["📷 Take photo", function(){ bannerCam = a; takePhoto(); }],
+          l: ["← Back", function(){ go(a, 1); }],
+          r: ["Skip photo →", function(){ skipped[k] = true; go(a, 4); }]});
+      }
       return;
     }
     // Camera finished: next camera, or send
@@ -1127,16 +1138,16 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var n = photoCount(), tot = kit.cams.length, dn = doneCount();
     var state = rec ? (rec.sync === true ? "✓ in sync" : rec.sync === false ? "✗ not in sync" : "") : "no photo";
     var thumbText = rec ? (rec.sync === false ? "Saved · camera NOT in sync" : "Photo saved · " + rec.name.replace(/^.*_(\d\d)(\d\d)(\d\d)\.jpg$/, "$1:$2:$3") + (rec.atomic ? " atomic" : "")) : "";
-    var retake = ["📷 Retake", function(){ delete skipped[k]; bannerCam = a; takePhoto(); }];
+    var back = ["← Back", function(){ if(rec) reviewSaved(a); else { delete skipped[k]; go(a, 2); } }];
     if(nextTarget){
       panel({step: 3, kick: name + " " + state + " · " + dn + " of " + tot + " cameras done", thumb: rec, thumbText: thumbText,
         go: ["Next camera: " + key(nextTarget) + " →", goNext],
-        l: n ? ["Send " + n + " photo" + (n > 1 ? "s" : "") + " now", sendAll] : null, r: retake});
+        l: back, r: n ? ["Send " + n + " now", sendAll] : null});
     } else {
       panel({step: 3, kick: "All " + tot + " camera" + (tot > 1 ? "s" : "") + " done ✓", thumb: rec, thumbText: thumbText,
         head: n ? "Send the photos to your group" : "All set", sub: n ? "You'll see them all once more before they go." : "",
         go: n ? ["Send " + n + " photo" + (n > 1 ? "s" : "") + " →", sendAll] : ["OK", hideNext],
-        l: retake});
+        l: back});
     }
   }
   // Remember whether the panel was up when a camera button is tapped (second tap opens its check)
@@ -1244,7 +1255,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function p2(n){ return (n < 10 ? "0" : "") + n; }
   function stamp(c, t, sync, exact){
     return [camInit.value, key(c), findCam(c.b, c.m) ? (c.m === OTHER ? "Other " + c.b : c.b + " " + shortName(c.m)) : "", "✓ " + countOf(c) + "/4",
-      p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + "  " + (exact === false ? "~" : "") + p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) + (synced ? " atomic" : " phone clock, not synced"),
+      p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + "  " + (exact === false ? "~" : "") + p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) + ((pending && pending.saved ? pending.atomic : synced) ? " atomic" : " phone clock, not synced"),
       sync === true ? "IN SYNC ✓" : sync === false ? "NOT IN SYNC ✗" : ""].filter(Boolean).join("  ·  ");
   }
   function compose(base, label, sync){
@@ -1342,18 +1353,19 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function openReview(){
     var c = pending.c; viewFrom = "review";
     vTitle.textContent = key(c) + " · step 3 of 3: same second on both?";
+    var backTo2 = function(){ pending = null; stopStream(); closeViewer(); go(c, 2); };
     vSub.innerHTML = pending.exact ? CHECK + " Tap the photo to zoom." :
       "<b>⚠ This photo's time can't be trusted to the second</b> (the phone camera didn't record it). Retake it with the in-app camera.";
     showImg(compose(pending.base, stamp(c, pending.t, undefined, pending.exact)).toDataURL("image/jpeg", .85));
     viewer.hidden = false;
     flowBar(pending.exact ? ["✓ Yes, in sync", function(){ keep(true); }] : ["📷 Retake", retake],
-      [["✕ Discard", function(){ pending = null; stopStream(); closeViewer(); showNext(c); }], pending.exact ? ["📷 Retake", retake] : null, ["✗ Not in sync", notInSync, "bad"]].filter(Boolean));
+      [["← Back", backTo2], pending.exact ? ["📷 Retake", retake] : null, ["✗ Not in sync", notInSync, "bad"]].filter(Boolean));
   }
   function notInSync(){
     var c = pending.c;
     vTitle.textContent = "✗ " + key(c) + " not in sync";
     vSub.innerHTML = "Set the camera's clock (phone app like SnapBridge, or the camera's date/time menu), shoot the clock again, then <b>retake</b> this photo.";
-    flowBar(["📷 Retake", retake], [["↩ Back", openReview], ["Keep anyway", function(){ keep(false); }, "bad"]]);
+    flowBar(["📷 Retake", retake], [["← Back", openReview], ["Keep anyway", function(){ keep(false); }, "bad"]]);
   }
   function retake(){ var c = pending ? pending.c : act(); closeViewer(); bannerCam = c; takePhoto(); }
   function keep(sync){
@@ -1361,10 +1373,25 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     compose(pending.base, stamp(c, t, sync, pending.exact), sync).toBlob(function(b){
       if(!b) return;
       var name = (camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg";
-      var rec = {day: ev.day, name: name, blob: b, cam: key(c), sync: sync, atomic: synced};
-      photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null; stopStream();
-      updateSend(); closeViewer(); setActive(key(c)); showNext(c);
+      var exact = pending.exact, atomic = pending.saved ? pending.atomic : synced;
+      pending.base.toBlob(function(raw){
+        var rec = {day: ev.day, name: name, blob: b, raw: raw, t: t.getTime(), exact: exact, cam: key(c), sync: sync, atomic: atomic};
+        photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null; stopStream();
+        updateSend(); closeViewer(); setActive(key(c)); go(c, 4);
+      }, "image/jpeg", 0.9);
     }, "image/jpeg", 0.85);
+  }
+  function reviewSaved(c){
+    var rec = photos[photoKey(c)]; if(!rec) return go(c, 2);
+    if(!rec.raw){ viewSaved(c, "saved"); return; }   // older photo without the clean copy
+    var img = new Image(), u = URL.createObjectURL(rec.raw);
+    img.onload = function(){
+      var base = document.createElement("canvas"); base.width = img.width; base.height = img.height; base.getContext("2d").drawImage(img, 0, 0);
+      URL.revokeObjectURL(u);
+      pending = {c: c, base: base, t: new Date(rec.t), exact: rec.exact !== false, saved: true, atomic: rec.atomic};
+      hideNext(); openReview();
+    };
+    img.src = u;
   }
   function closeViewer(){ viewer.hidden = true; viewScroll.classList.remove("zoom"); if(viewUrl){ URL.revokeObjectURL(viewUrl); viewUrl = null; } }
   // A saved photo, from the thumbnail in the check or from the send list
@@ -1452,7 +1479,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   // Step back from the banner: reopen this camera's check (untick there), or clear everything
   // Start over just one camera: its ticks and its photo; other cameras are untouched
   function resetCam(c){
-    var k = photoKey(c); ticksOf(c).fill(false); delete shotClock[k]; delete skipped[k];
+    var k = photoKey(c); ticksOf(c).fill(false); delete shotClock[k]; delete skipped[k]; delete at[k];
     delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     save(); updateSend(); refresh();
   }
@@ -1476,7 +1503,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     updateSend(); renderPhotoRow();
   });
-  function clearAll(){ shotClock = {}; skipped = {}; ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
+  function clearAll(){ shotClock = {}; skipped = {}; at = {}; ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
   twoTap(document.getElementById("newEvent"), "Clear all cameras", "Tap again to clear every camera", clearAll);
   // Same, from the main screen next to Sync now (ticks and photos of every camera; cameras and initials stay)
   twoTap(document.getElementById("clearMain"), "Clear all", "Sure?", clearAll);
