@@ -99,6 +99,10 @@ body.photo .showhint{display:block}
 .controls button.clearmain{color:var(--muted)}
 .controls button.initbtn{font-weight:700; letter-spacing:.04em}
 .camlabel{cursor:pointer}
+.camlabel.noinit{min-width:3em; text-align:center}
+/* No cameras yet: the + sits alone in the middle of the row, a little bigger */
+.strip.main.only{justify-content:center}
+.strip.main.only .chip.plus{min-width:4.5rem; padding:.7rem 1.4rem; font-size:1.4rem}
 .controls button.clearmain.armed{color:#fff; background:var(--bad); border-radius:6px; padding:.3rem .55rem; text-decoration:none}
 .controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
 /* Camera settings button + sheet */
@@ -698,9 +702,10 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function updateCam(){
     camInit.value = camInit.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
     var a = act(), parts = [];
-    if(camInit.value) parts.push(camInit.value);
+    parts.push(camInit.value || "✎");   // no initials yet: the white box still shows, with a pencil to add them
     if(!kit.empty) parts.push(a.type + " " + a.n);
     camLabelEl.textContent = parts.join(" · ");
+    camLabelEl.classList.toggle("noinit", !camInit.value);
     document.getElementById("camModel").textContent =
       !findCam(a.b, a.m) ? "" : a.m === OTHER ? (a.b === "Other" ? "Other camera" : "Other " + a.b + " model") : a.b + " " + shortName(a.m);
     var setEl = document.getElementById("camSet"), cc = findCam(a.b, a.m), n = countOf(a);
@@ -994,6 +999,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     bt.disabled = !!disabled; bt.addEventListener("click", onClick); return bt;
   }
   function renderStrips(){
+    stripEl.classList.toggle("only", !!kit.empty);
     stripEl.textContent = ""; tabsEl.textContent = "";
     kit.cams.forEach(function(c){
       if(kit.empty) return;
