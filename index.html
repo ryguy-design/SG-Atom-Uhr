@@ -84,7 +84,11 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 main{cursor:pointer}
 .taphint{font-size:.72rem; color:var(--muted); opacity:.55; text-align:center; margin:0 0 .45rem}
 .showhint{display:none; position:fixed; left:0; right:0; bottom:max(14px,env(safe-area-inset-bottom,0px)); font-size:.72rem; color:var(--muted); opacity:.45; text-align:center; pointer-events:none}
-body.photo footer, body.photo .taphint, body.photo .rotbtn{display:none}
+body.photo footer, body.photo .taphint, body.photo .rotbtn, body.photo .visits{display:none}
+/* Small visit counter, top-left corner */
+.visits{position:fixed; z-index:5; top:max(14px,env(safe-area-inset-top,0px)); left:max(14px,env(safe-area-inset-left,0px));
+  font-size:.75rem; font-weight:600; color:var(--muted); opacity:.7; font-variant-numeric:tabular-nums; pointer-events:none}
+.visits[hidden]{display:none}
 /* Rotate icon, top-right corner; turns the whole app 90° even with the phone's rotation lock on */
 .rotbtn{position:fixed; z-index:5; top:max(10px,env(safe-area-inset-top,0px)); right:max(10px,env(safe-area-inset-right,0px));
   width:2.6rem; height:2.6rem; display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
@@ -305,6 +309,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </head>
 <body>
 
+<div id="visits" class="visits" hidden aria-label="Visits"></div>
 <button id="rotBtn" class="rotbtn" type="button" aria-pressed="false" aria-label="Rotate screen" title="Rotate screen">
   <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="3" width="9" height="15" rx="1.8"/><line x1="10.8" y1="15.4" x2="13.2" y2="15.4"/><path d="M3.5 13.5a8.5 8.5 0 0 0 7 7.3"/><path d="M8.2 20.9l2.3-.1-.6-2.2"/><path d="M20.5 10.5a8.5 8.5 0 0 0-7-7.3"/><path d="M15.8 3.1l-2.3.1.6 2.2"/></svg>
 </button>
@@ -435,6 +440,19 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </div>
 
 <script>
+// Visit counter (GoatCounter, no cookies). Site code below; the number shows once the counter is allowed in its settings.
+var GC_CODE = "sgatomuhr";
+(function(){
+  var sc = document.createElement("script"); sc.async = true; sc.src = "https://gc.zgo.at/count.js";
+  sc.setAttribute("data-goatcounter", "https://" + GC_CODE + ".goatcounter.com/count"); document.head.appendChild(sc);
+  function show(){
+    fetch("https://" + GC_CODE + ".goatcounter.com/counter/TOTAL.json").then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+      var el = document.getElementById("visits"); if(!el || !j || !j.count) return;
+      el.textContent = "👁 " + j.count + " visits"; el.hidden = false;
+    }).catch(function(){});
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", show); else show();
+})();
 (function(){
   function pad(n,w){ n=String(n); while(n.length<(w||2)) n="0"+n; return n; }
 
