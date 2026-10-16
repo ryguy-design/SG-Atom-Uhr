@@ -95,6 +95,8 @@ body.photo .showhint{display:block}
 .switch .knob{position:absolute; top:.15rem; left:.15rem; width:1.1rem; height:1.1rem; border-radius:50%; background:var(--fg); transition:transform .15s}
 .switch input:checked + .track{background:var(--fg)}
 .switch input:checked + .track .knob{transform:translateX(1rem); background:var(--bg)}
+.controls button.clearmain{color:var(--muted)}
+.controls button.clearmain.armed{color:#fff; background:var(--bad); border-radius:6px; padding:.3rem .55rem; text-decoration:none}
 .controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
 /* Camera settings button + sheet */
 /* Shown while location is on: a photo of the screen reveals the exact position */
@@ -246,6 +248,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   </div>
   <div class="controls">
     <button id="resync" type="button">Sync now</button>
+    <button id="clearMain" class="clearmain" type="button">Clear all</button>
     <label class="switch" for="locToggle">
       <span>Location</span>
       <input id="locToggle" type="checkbox" role="switch" aria-controls="place">
@@ -1139,9 +1142,10 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     updateSend(); renderPhotoRow();
   });
-  twoTap(document.getElementById("newEvent"), "Clear all cameras", "Tap again to clear every camera", function(){
-    ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh();
-  });
+  function clearAll(){ ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
+  twoTap(document.getElementById("newEvent"), "Clear all cameras", "Tap again to clear every camera", clearAll);
+  // Same, from the main screen next to Sync now (ticks and photos of every camera; cameras and initials stay)
+  twoTap(document.getElementById("clearMain"), "Clear all", "Sure?", clearAll);
   twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", function(){
     try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
     camInit.value = ""; kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = []; dbClear();
