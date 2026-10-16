@@ -1035,7 +1035,6 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       cb.type = "checkbox"; cb.id = "chk" + i; cb.checked = !!t[i];
       cb.addEventListener("change", function(){
         t[i] = cb.checked; save(); updateCount(); renderStrips(); updateSheetGo();
-        if(isDone(a)) setTimeout(function(){ closeSheet(); showNext(a); }, 350);
       });
       sp.innerHTML = '<span class="t"></span><span class="d">' + item[1] + "</span>";
       sp.firstChild.textContent = item[0];
