@@ -960,7 +960,14 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
   refresh();
 
   // ================= Keep screen awake =================
-  function wake(){ if(navigator.wakeLock && document.visibilityState==="visible") navigator.wakeLock.request("screen").catch(function(){}); }
+  // Asked for on open, again whenever the app comes back, and on any tap
+  // (some phones only grant it after a tap, and the lock can drop silently)
+  var lock = null;
+  function wake(){
+    if(!navigator.wakeLock || document.visibilityState !== "visible" || (lock && !lock.released)) return;
+    navigator.wakeLock.request("screen").then(function(l){ lock = l; l.addEventListener("release", function(){ lock = null; }); }).catch(function(){});
+  }
+  document.addEventListener("pointerdown", wake, true);
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState==="visible"){ wake(); sync(); } });
 
   setInterval(sync, 10*60*1000);
