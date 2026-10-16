@@ -705,7 +705,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       if(b === "Canon") return [
         ["White balance", "<b>AWB</b> — regular Auto, not AWB W"],
         ["Picture Style", "<b>Neutral (N)</b>"],
-        ["JPEG quality", "JPEG only (RAW off) with the <b>staircase</b> icon. If there's a JPEG quality 1–10 setting: <b>6</b>"],
+        ["JPEG quality", "JPEG only (RAW off), <b>Normal</b> quality (the jagged icon, not the smooth Fine one). If there's a JPEG quality 1–10 setting: <b>6/10</b>"],
         ["Image size", SIZE_ANY]];
       if(b === "Fujifilm") return [
         ["White balance", "<b>AUTO</b> — plain AUTO, not White or Ambience priority"],
@@ -735,8 +735,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     if(b === "Canon") return [
       ["White balance", has(CANON_NO_AWBW, c[0]) ? "<b>AWB</b> (Auto)" : "<b>AWB</b> — regular Auto (Ambience priority), not AWB W"],
       ["Picture Style", "<b>Neutral (N)</b>"],
-      ["JPEG quality", "JPEG only (RAW off) with the <b>staircase</b> icon. If there's a JPEG quality 1–10 setting: <b>6</b>, the first staircase step down from 10"],
-      ["Image size", "Image quality <b>" + size + "</b> (staircase) · " + px + " px"]
+      ["JPEG quality", "JPEG only (RAW off), <b>Normal</b> quality (the jagged icon, not the smooth Fine one). If there's a JPEG quality 1–10 setting: <b>6/10</b>, the first jagged step down from 10"],
+      ["Image size", "Image quality <b>" + size + "</b> Normal (jagged icon) · " + px + " px"]
     ];
     if(b === "Fujifilm") return [
       ["White balance", has(FUJI_AUTO_PRIORITY, c[0]) ? "<b>AUTO</b> — plain AUTO, not White or Ambience priority" : "<b>AUTO</b>"],
@@ -757,7 +757,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var size = c[1], px = c[2];
     if(c[0] === OTHER) return "Auto WB · Neutral · JPEG standard · ≥4000 px";
     if(b === "Sony") return "AWB · " + (c[3] === "style0" ? "Standard" : "NT") + " · JPEG Std · " + size + " " + px;
-    if(b === "Canon") return "AWB · Neutral · JPEG staircase · " + size + " " + px;
+    if(b === "Canon") return "AWB · Neutral · JPEG Normal (6/10) · " + size + " " + px;
     if(b === "Fujifilm") return "AUTO · PROVIA · NORMAL · " + size + " " + px;
     return (has(NIKON_PLAIN_AUTO, c[0]) ? "Auto" : "AUTO1") + " · NL · JPEG normal · " + c[3] + " " + size.charAt(0) + " " + px;
   }
