@@ -174,7 +174,10 @@ body.photo .showhint{display:block}
 .nb-msg b{color:var(--ok); font-size:1rem}
 .nb-msg span{font-size:.85rem; color:#cfe9d6}
 .nb-next{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:#06210e; background:var(--ok); border:0; border-radius:10px; padding:.6rem 1rem; cursor:pointer}
-.nb-next:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.nb-next:focus-visible,.nb-photo:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.nb-photo{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:var(--fg); background:transparent; border:2px solid var(--ok); border-radius:10px; padding:.5rem .8rem; cursor:pointer; white-space:nowrap}
+.nb-photo.done{border-color:#3a6b47; color:#cfe9d6; font-weight:700}
+.resetbtn.send{color:#06210e; background:var(--ok); border-color:var(--ok)}
 .resetbtn{align-self:center; font:inherit; font-size:.9rem; font-weight:700; color:var(--bad); background:transparent; border:1.5px solid var(--bad); border-radius:999px; padding:.45rem 1.1rem; cursor:pointer; margin-top:.2rem}
 .resetbtn.armed{background:var(--bad); color:#fff}
 .resetbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
@@ -260,6 +263,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     <ol id="checklist" class="checklist"></ol>
     <p id="sheetNote" class="sheet-note"></p>
     <div class="endrow">
+      <button id="sendPhotos" class="resetbtn send" type="button" hidden></button>
       <button id="newEvent" class="resetbtn neutral" type="button">New event: clear all ticks</button>
       <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
     </div>
@@ -268,7 +272,9 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 
 <div id="nextBar" class="nextbar" hidden role="status">
   <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span></div>
+  <button id="nbPhoto" class="nb-photo" type="button"></button>
   <button id="nbNext" class="nb-next" type="button"></button>
+  <input id="photoIn" type="file" accept="image/*" capture="environment" hidden>
 </div>
 
 <script>
@@ -835,7 +841,12 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function renderStrips(){
     stripEl.textContent = ""; tabsEl.textContent = "";
     kit.cams.forEach(function(c){
-      stripEl.appendChild(chip(c, function(){ addOpen = false; var was = key(c) === kit.active; setActive(key(c)); if(was || !isDone(c)) openSheet(); }));
+      stripEl.appendChild(chip(c, function(){
+        addOpen = false; var was = key(c) === kit.active, up = bannerWasUp; setActive(key(c));
+        if(!isDone(c)) openSheet();
+        else if(was && up) openSheet();   // banner was showing: second tap opens the check
+        else showNext(c);                  // finished camera: bring back its banner (photo of the camera back, next camera)
+      }));
       tabsEl.appendChild(chip(c, function(){ setActive(key(c)); }));
     });
     var hc = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.cams.length - hc;
@@ -952,12 +963,17 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && !isDone(c)) return c; }
     return null;
   }
-  var nextTarget = null, nextTimer = null;
+  var nextTarget = null, nextTimer = null, bannerCam = null, bannerWasUp = false;
+  var nbPhoto = document.getElementById("nbPhoto"), photoIn = document.getElementById("photoIn"), sendBtn = document.getElementById("sendPhotos");
   function showNext(a){
-    nextTarget = nextAfter(a);
+    nextTarget = nextAfter(a); bannerCam = a;
+    var got = !!photos[photoKey(a)], n = photoCount();
     nbTitle.textContent = "✓ " + key(a) + " ready";
-    nbSub.textContent = nextTarget ? "Photograph the clock now, then go to the next camera." : "Photograph the clock now. That's every camera done.";
-    nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : "OK";
+    nbSub.textContent = !got ? "Shoot the clock, then take a photo of the camera's screen." :
+      nextTarget ? "Back-of-camera photo saved." : "Every camera done. Send the photos to the group.";
+    nbPhoto.textContent = got ? "📷 Retake" : "📷 Camera back";
+    nbPhoto.classList.toggle("done", got);
+    nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : n ? "Send " + n + " photo" + (n > 1 ? "s" : "") : "OK";
     nextBar.hidden = false;
     // Sits for 10 seconds, then gets out of the way of the clock
     clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 10000);
@@ -966,9 +982,88 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   nbNext.addEventListener("click", function(){
     hideNext();
     if(nextTarget){ setActive(key(nextTarget)); openSheet(); }
+    else if(photoCount()) sendAll();
   });
   // Tap anywhere outside the banner to hide it sooner
-  document.addEventListener("pointerdown", function(e){ if(!nextBar.hidden && !nextBar.contains(e.target)) hideNext(); }, true);
+  document.addEventListener("pointerdown", function(e){
+    bannerWasUp = !nextBar.hidden;
+    if(!nextBar.hidden && !nextBar.contains(e.target)) hideNext();
+  }, true);
+
+  // ---- Photo of the back of the camera: taken in the app, labelled, kept until sent ----
+  // Kept in the phone's storage (IndexedDB) so they survive the app reloading while the camera is open.
+  var photos = {}, DB = null;
+  function photoKey(c){ return key(c) + "|" + c.b + "|" + c.m; }
+  function photoCount(){ var n = 0; kit.cams.forEach(function(c){ if(photos[photoKey(c)]) n++; }); return n; }
+  function db(cb){
+    if(DB) return cb(DB);
+    try{
+      var rq = indexedDB.open("acPhotos", 1);
+      rq.onupgradeneeded = function(){ rq.result.createObjectStore("p"); };
+      rq.onsuccess = function(){ DB = rq.result; cb(DB); };
+      rq.onerror = function(){};
+    }catch(e){}
+  }
+  function dbPut(k, v){ db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").put(v, k); }catch(e){} }); }
+  function dbClear(){ photos = {}; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").clear(); }catch(e){} }); updateSend(); }
+  function loadPhotos(){
+    db(function(d){
+      try{
+        var st = d.transaction("p","readwrite").objectStore("p"), rq = st.openCursor();
+        rq.onsuccess = function(){
+          var cur = rq.result; if(!cur){ updateSend(); return; }
+          if(cur.value && cur.value.day === ev.day) photos[cur.key] = cur.value; else cur.delete();   // older events are dropped
+          cur.continue();
+        };
+      }catch(e){}
+    });
+  }
+  function updateSend(){
+    var n = photoCount();
+    sendBtn.hidden = !n; sendBtn.textContent = "📷 Send " + n + " camera photo" + (n > 1 ? "s" : "");
+  }
+  nbPhoto.addEventListener("click", function(){ photoIn.value = ""; photoIn.click(); });
+  photoIn.addEventListener("change", function(){
+    var f = photoIn.files && photoIn.files[0], c = bannerCam || act(); if(!f || !c) return;
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function(){
+      // Scale to a chat-friendly size and add a strip saying which camera it is
+      var max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
+      var w = Math.round(img.width * k), h = Math.round(img.height * k), bar = Math.round(Math.max(w, h) * 0.06);
+      var cv = document.createElement("canvas"); cv.width = w; cv.height = h + bar;
+      var g = cv.getContext("2d"); g.drawImage(img, 0, 0, w, h);
+      g.fillStyle = "#000"; g.fillRect(0, h, w, bar);
+      var t = new Date(Date.now() + offset), p2 = function(n){ return (n < 10 ? "0" : "") + n; };
+      var label = [camInit.value, key(c), findCam(c.b, c.m) ? (c.m === OTHER ? "Other " + c.b : c.b + " " + shortName(c.m)) : "", "✓ " + countOf(c) + "/4",
+        p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + " " + p2(t.getHours()) + ":" + p2(t.getMinutes())].filter(Boolean).join("  ·  ");
+      var fs = Math.round(bar * 0.48); g.font = "700 " + fs + "px system-ui, -apple-system, Roboto, sans-serif";
+      while(g.measureText(label).width > w * 0.95 && fs > 8){ fs--; g.font = "700 " + fs + "px system-ui, -apple-system, Roboto, sans-serif"; }
+      g.fillStyle = "#fff"; g.textBaseline = "middle"; g.fillText(label, Math.round(bar * 0.35), h + bar / 2);
+      URL.revokeObjectURL(url);
+      cv.toBlob(function(b){
+        if(!b) return;
+        var name = ((camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + ".jpg");
+        var rec = {day: ev.day, name: name, blob: b, cam: key(c)};
+        photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); updateSend();
+        setActive(key(c)); showNext(c);
+      }, "image/jpeg", 0.85);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); };
+    img.src = url;
+  });
+  function sendAll(){
+    var list = kit.cams.map(function(c){ return photos[photoKey(c)]; }).filter(Boolean);
+    if(!list.length) return;
+    var files = list.map(function(x){ return new File([x.blob], x.name, {type: "image/jpeg"}); });
+    var text = (camInit.value ? camInit.value + " · " : "") + "camera check " + ev.day.split("-").reverse().join(".");
+    if(navigator.canShare && navigator.canShare({files: files})){
+      navigator.share({files: files, text: text}).catch(function(){});
+    } else {
+      // No share sheet (e.g. desktop): download them instead
+      files.forEach(function(f){ var a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
+    }
+  }
+  sendBtn.addEventListener("click", sendAll);
 
   function openSheet(){ hideNext(); sheet.hidden = false; if(rotated) fit(); document.getElementById("sheetClose").focus(); }
   function closeSheet(){ sheet.hidden = true; if(rotated) fit(); var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
@@ -990,20 +1085,20 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     });
   }
   twoTap(document.getElementById("newEvent"), "New event: clear all ticks", "Tap again to clear all ticks", function(){
-    ev = {day: today(), ticks: {}}; save(); hideNext(); refresh();
+    ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh();
   });
   twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", function(){
     try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
-    camInit.value = ""; kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = [];
+    camInit.value = ""; kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = []; dbClear();
     save(); hideNext(); refresh();
     showLoc = false; applyLoc();
   });
 
   // A new day starts a new event: re-check whenever the app comes back to the screen
-  function dayCheck(){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); hideNext(); refresh(); } }
+  function dayCheck(){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); hideNext(); dbClear(); refresh(); } }
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") dayCheck(); });
   setInterval(dayCheck, 60*1000);   // also clears at midnight while the app stays open
-  refresh();
+  refresh(); syncEvent(); loadPhotos();
 
   // ================= Photo mode: tap the clock to hide the buttons =================
   mainEl.addEventListener("click", function(){ document.body.classList.toggle("photo"); fit(); });
