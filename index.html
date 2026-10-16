@@ -167,7 +167,7 @@ body.photo .showhint{display:block}
 .endrow{display:flex; justify-content:center; gap:.6rem; flex-wrap:wrap}
 .resetbtn.neutral{color:var(--fg); border-color:#56626a}
 /* Next-camera prompt, shown after a camera's four checks are done */
-.nextbar{position:fixed; left:0; right:0; bottom:0; z-index:9; display:flex; align-items:center; gap:.7rem;
+.nextbar{position:fixed; left:0; right:0; bottom:0; z-index:9; display:flex; flex-direction:column; align-items:stretch; gap:.35rem; text-align:left;
   background:#12301b; border-top:2px solid var(--ok); color:var(--fg);
   padding-block:.8rem max(.8rem, env(safe-area-inset-bottom,0px));
   padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
@@ -179,7 +179,29 @@ body.photo .showhint{display:block}
 .nb-next:focus-visible,.nb-photo:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .nb-photo{flex-shrink:0; font:inherit; font-size:1.25rem; line-height:1; color:var(--fg); background:transparent; border:2px solid var(--ok); border-radius:10px; padding:.4rem .7rem; cursor:pointer; position:relative}
 .nb-photo.done::after{content:"✓"; position:absolute; top:-.45rem; right:-.45rem; font-size:.7rem; font-weight:900; color:#06210e; background:var(--ok); border-radius:50%; width:1.1rem; height:1.1rem; line-height:1.1rem; text-align:center}
-.nextbar{flex-wrap:wrap; row-gap:.6rem}
+.nextbar{background:#151b1f}
+.fl-top{display:flex; align-items:center; gap:.6rem}
+.fl-steps{flex:1; display:flex; gap:.35rem}
+.fl-steps i{flex:1; height:5px; border-radius:3px; background:#2a3238}
+.fl-steps i.on{background:var(--ok)} .fl-steps i.cur{background:var(--fg)}
+.fl-x{flex-shrink:0; font:inherit; font-size:.85rem; color:var(--muted); background:none; border:1px solid #3a444b; border-radius:50%; width:1.7rem; height:1.7rem; padding:0; cursor:pointer}
+.fl-kick{font-size:.7rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:.15rem}
+.fl-kick:empty,.fl-head:empty,.fl-sub:empty{display:none}
+.fl-head{font-size:1.1rem; font-weight:800; color:var(--fg)}
+.fl-sub{font-size:.85rem; color:#c9d1d5; line-height:1.35}
+.fl-thumb{display:flex; align-items:center; gap:.6rem; background:#1d252a; border:0; border-radius:10px; padding:.4rem; font:inherit; cursor:zoom-in; text-align:left}
+.fl-thumb[hidden]{display:none}
+.fl-thumb img{width:3rem; height:2.25rem; object-fit:cover; border-radius:4px}
+.fl-thumb span{font-size:.85rem; font-weight:700; color:var(--ok)}
+.fl-thumb.bad span{color:#f3b5b6}
+.fl-go{margin-top:.35rem; font:inherit; font-size:1.05rem; font-weight:800; color:#06210e; background:var(--ok); border:0; border-radius:12px; padding:.8rem; cursor:pointer}
+.fl-links{display:flex; justify-content:space-between; gap:1rem; min-height:1.4rem}
+.fl-link{font:inherit; font-size:.82rem; color:var(--muted); background:none; border:0; padding:.2rem 0; text-decoration:underline; text-underline-offset:3px; cursor:pointer}
+.fl-link:empty{visibility:hidden}
+.fl-link.bad{color:#f3b5b6}
+.fl-go:focus-visible,.fl-link:focus-visible,.fl-x:focus-visible,.fl-thumb:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+/* Review screen: same pattern, one big answer and small links */
+.view-bar.flow{flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:.45rem}
 .nb-msg{flex:1 1 100%}
 .nb-btns{flex:1 1 100%; display:flex; gap:.5rem; align-items:stretch}
 .nb-btns .nb-next{margin-left:auto}
@@ -350,14 +372,15 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   <div class="view-bar"><button id="sBack" class="nb-btn" type="button">↩ Back</button><button id="sGo" class="nb-next" type="button"></button></div>
 </div>
 
-<div id="nextBar" class="nextbar" hidden role="status">
-  <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span></div>
-  <div class="nb-btns">
-    <button id="nbBack" class="nb-btn" type="button">↩ Back</button>
-    <button id="nbClear" class="nb-btn clear" type="button">Start over</button>
-    <button id="nbPhoto" class="nb-photo" type="button" aria-label="Photo of the camera back">📷</button>
-    <button id="nbNext" class="nb-next" type="button"></button>
-  </div>
+<!-- After a camera's 4 ticks: one step at a time, one big button per step -->
+<div id="nextBar" class="nextbar" hidden role="region" aria-label="Camera steps">
+  <div class="fl-top"><div id="flSteps" class="fl-steps"><i></i><i></i><i></i></div><button id="flX" class="fl-x" type="button" aria-label="Hide">✕</button></div>
+  <div id="flKick" class="fl-kick"></div>
+  <div id="flHead" class="fl-head"></div>
+  <div id="flSub" class="fl-sub"></div>
+  <button id="flThumb" class="fl-thumb" type="button" hidden><img alt=""><span></span></button>
+  <button id="flGo" class="fl-go" type="button"></button>
+  <div class="fl-links"><button id="flL" class="fl-link" type="button"></button><button id="flR" class="fl-link" type="button"></button></div>
   <input id="photoIn" type="file" accept="image/*" capture="environment" hidden>
 </div>
 
@@ -869,7 +892,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   var brandSel = document.getElementById("brand"), modelSel = document.getElementById("model");
   var recentEl = document.getElementById("recent"), listEl = document.getElementById("checklist"), noteEl = document.getElementById("sheetNote");
   var stripEl = document.getElementById("strip"), tabsEl = document.getElementById("tabs");
-  var nextBar = document.getElementById("nextBar"), nbTitle = document.getElementById("nbTitle"), nbSub = document.getElementById("nbSub"), nbNext = document.getElementById("nbNext");
+  var nextBar = document.getElementById("nextBar");
 
   // ---- My cameras: saved for good (up to 4 hand cams + 4 LS, each with its own brand/model) ----
   var MAXN = 4, kit = null, ev = null, recent = [];
@@ -1047,36 +1070,73 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var i = kit.cams.indexOf(a);
     // Next camera still needing something: its checks, or (once photos are in use) its camera-back photo
     var usingPhotos = photoCount() > 0;
-    for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && (!isDone(c) || (usingPhotos && !photos[photoKey(c)]))) return c; }
+    for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && (!isDone(c) || (usingPhotos && !photos[photoKey(c)] && !skipped[photoKey(c)]))) return c; }
     return null;
   }
-  var nextTarget = null, nextTimer = null, bannerCam = null, bannerWasUp = false;
-  var nbPhoto = document.getElementById("nbPhoto"), photoIn = document.getElementById("photoIn"), sendBtn = document.getElementById("sendPhotos");
-  function showNext(a){
-    nextTarget = nextAfter(a); bannerCam = a;
-    var got = !!photos[photoKey(a)], n = photoCount();
-    nbTitle.textContent = "✓ " + key(a) + " ready";
-    var rec = photos[photoKey(a)];
-    nbSub.textContent = !got ? "Shoot the clock, then 📷 the camera's screen." :
-      (rec.sync === false ? "Photo saved, camera NOT in sync. " : "Photo saved, in sync ✓. ") + (nextTarget ? "" : "Every camera done: send them.");
-    nbPhoto.setAttribute("aria-label", got ? "Retake photo of the camera back" : "Photo of the camera back");
-    nbPhoto.classList.toggle("done", got);
-    nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : n ? "Send " + n + " photo" + (n > 1 ? "s" : "") : "OK";
+  // ---- The step panel: 1 shoot the clock · 2 photo of the camera screen · 3 check · then next camera / send ----
+  var nextTarget = null, bannerCam = null, bannerWasUp = false, shotClock = {}, skipped = {};
+  var photoIn = document.getElementById("photoIn"), sendBtn = document.getElementById("sendPhotos");
+  var flSteps = document.getElementById("flSteps").children, flKick = document.getElementById("flKick"), flHead = document.getElementById("flHead"), flSub = document.getElementById("flSub");
+  var flThumb = document.getElementById("flThumb"), flGo = document.getElementById("flGo"), flL = document.getElementById("flL"), flR = document.getElementById("flR"), flThumbUrl = null;
+  var act_go = null, act_l = null, act_r = null;
+  function panel(o){
+    for(var i = 0; i < 3; i++) flSteps[i].className = i < o.step ? "on" : i === o.step ? "cur" : "";
+    flKick.textContent = o.kick || ""; flHead.textContent = o.head || ""; flSub.textContent = o.sub || "";
+    if(flThumbUrl){ URL.revokeObjectURL(flThumbUrl); flThumbUrl = null; }
+    flThumb.hidden = !o.thumb;
+    if(o.thumb){ flThumbUrl = URL.createObjectURL(o.thumb.blob); flThumb.firstChild.src = flThumbUrl; flThumb.lastChild.textContent = o.thumbText; flThumb.classList.toggle("bad", o.thumb.sync !== true); }
+    flGo.textContent = o.go[0]; act_go = o.go[1];
+    flL.textContent = o.l ? o.l[0] : ""; act_l = o.l ? o.l[1] : null; flL.className = "fl-link" + (o.l && o.l[2] ? " " + o.l[2] : "");
+    flR.textContent = o.r ? o.r[0] : ""; act_r = o.r ? o.r[1] : null; flR.className = "fl-link" + (o.r && o.r[2] ? " " + o.r[2] : "");
     nextBar.hidden = false;
-    // Sits for 10 seconds, then gets out of the way of the clock
-    clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 10000);
   }
-  function hideNext(){ clearTimeout(nextTimer); nextBar.hidden = true; }
-  nbNext.addEventListener("click", function(){
-    hideNext();
-    if(nextTarget){ var t = nextTarget; setActive(key(t)); if(isDone(t)) showNext(t); else openSheet(); }
-    else if(photoCount()) sendAll();
-  });
-  // Tap anywhere outside the banner to hide it sooner
-  document.addEventListener("pointerdown", function(e){
-    bannerWasUp = !nextBar.hidden;
-    if(!nextBar.hidden && !nextBar.contains(e.target)) hideNext();
-  }, true);
+  flGo.addEventListener("click", function(){ if(act_go) act_go(); });
+  flL.addEventListener("click", function(){ if(act_l) act_l(); });
+  flR.addEventListener("click", function(){ if(act_r) act_r(); });
+  document.getElementById("flX").addEventListener("click", hideNext);
+  flThumb.addEventListener("click", function(){ if(bannerCam) viewSaved(bannerCam, "saved"); });
+  function hideNext(){ nextBar.hidden = true; }
+  function doneCount(){ var n = 0; kit.cams.forEach(function(c){ if(isDone(c) && (photos[photoKey(c)] || skipped[photoKey(c)])) n++; }); return n; }
+  function goNext(){
+    var t = nextTarget; if(!t) return;
+    setActive(key(t)); if(isDone(t)) showNext(t); else { hideNext(); openSheet(); }
+  }
+  function showNext(a){
+    bannerCam = a; var k = photoKey(a), rec = photos[k], name = key(a);
+    if(!rec && !skipped[k] && !shotClock[k]){
+      // Step 1: shoot the clock with the camera
+      panel({step: 0, kick: name + " · step 1 of 3", head: "Shoot the clock with your camera", sub: "Point " + name + " at this screen and take a shot.",
+        go: ["Done, I shot it →", function(){ shotClock[k] = true; showNext(a); }],
+        l: ["↩ Back to checks", function(){ hideNext(); setActive(key(a)); openSheet(); }]});
+      return;
+    }
+    if(!rec && !skipped[k]){
+      // Step 2: photo of the camera's screen
+      panel({step: 1, kick: name + " · step 2 of 3", head: "Photograph the camera's screen", sub: "Show the shot of the clock and the camera's time. You'll check it next.",
+        go: ["📷 Take photo", function(){ bannerCam = a; takePhoto(); }],
+        l: ["↩ Back", function(){ delete shotClock[k]; showNext(a); }],
+        r: ["Skip photo", function(){ skipped[k] = true; showNext(a); }]});
+      return;
+    }
+    // Camera finished: next camera, or send
+    nextTarget = nextAfter(a);
+    var n = photoCount(), tot = kit.cams.length, dn = doneCount();
+    var state = rec ? (rec.sync === true ? "✓ in sync" : rec.sync === false ? "✗ not in sync" : "") : "no photo";
+    var thumbText = rec ? (rec.sync === false ? "Saved · camera NOT in sync" : "Photo saved · " + rec.name.replace(/^.*_(\d\d)(\d\d)(\d\d)\.jpg$/, "$1:$2:$3") + (rec.atomic ? " atomic" : "")) : "";
+    var retake = ["📷 Retake", function(){ delete skipped[k]; bannerCam = a; takePhoto(); }];
+    if(nextTarget){
+      panel({step: 3, kick: name + " " + state + " · " + dn + " of " + tot + " cameras done", thumb: rec, thumbText: thumbText,
+        go: ["Next camera: " + key(nextTarget) + " →", goNext],
+        l: n ? ["Send " + n + " photo" + (n > 1 ? "s" : "") + " now", sendAll] : null, r: retake});
+    } else {
+      panel({step: 3, kick: "All " + tot + " camera" + (tot > 1 ? "s" : "") + " done ✓", thumb: rec, thumbText: thumbText,
+        head: n ? "Send the photos to your group" : "All set", sub: n ? "You'll see them all once more before they go." : "",
+        go: n ? ["Send " + n + " photo" + (n > 1 ? "s" : "") + " →", sendAll] : ["OK", hideNext],
+        l: retake});
+    }
+  }
+  // Remember whether the panel was up when a camera button is tapped (second tap opens its check)
+  document.addEventListener("pointerdown", function(){ bannerWasUp = !nextBar.hidden; }, true);
 
   // ---- Photo of the back of the camera: taken in the app, labelled, kept until sent ----
   // Kept in the phone's storage (IndexedDB) so they survive the app reloading while the camera is open.
@@ -1110,7 +1170,6 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var n = photoCount(); if(typeof renderPhotoRow === "function" && photoRow) renderPhotoRow();
     sendBtn.hidden = !n; sendBtn.textContent = "📷 Send " + n + " camera photo" + (n > 1 ? "s" : "");
   }
-  nbPhoto.addEventListener("click", function(){ takePhoto(); });
   // Rotated app: these full screens show upright, so refit whenever one opens or closes
   if(window.MutationObserver) ["cam","viewer","sendView"].forEach(function(id){
     new MutationObserver(function(){ if(rotated) fit(); }).observe(document.getElementById(id), {attributes: true, attributeFilter: ["hidden"]});
@@ -1239,23 +1298,31 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     btns.forEach(function(b){ var el = document.createElement("button"); el.type = "button"; el.className = b[2] || "nb-btn"; el.textContent = b[0]; el.addEventListener("click", b[1]); vBar.appendChild(el); });
     var last = vBar.lastChild; if(last) last.focus();
   }
+  // Review layout: optional big button, then a row of small links
+  function flowBar(go, links){
+    vBar.textContent = ""; vBar.className = "view-bar flow";
+    if(go){ var g = document.createElement("button"); g.type = "button"; g.className = "fl-go"; g.textContent = go[0]; g.addEventListener("click", go[1]); vBar.appendChild(g); }
+    var row = document.createElement("div"); row.className = "fl-links";
+    links.forEach(function(l){ var el = document.createElement("button"); el.type = "button"; el.className = "fl-link" + (l[2] ? " " + l[2] : ""); el.textContent = l[0]; el.addEventListener("click", l[1]); row.appendChild(el); });
+    vBar.appendChild(row);
+    (vBar.querySelector(".fl-go") || row.firstChild).focus();
+  }
   var CHECK = "Zoom in on the camera's screen: the <b>clock in its photo</b> and the <b>camera's own time</b> should show the same second.";
   function openReview(){
     var c = pending.c; viewFrom = "review";
-    vTitle.textContent = "📷 " + key(c) + ": is the camera in sync?";
+    vTitle.textContent = key(c) + " · step 3 of 3: same second on both?";
     vSub.innerHTML = pending.exact ? CHECK + " Tap the photo to zoom." :
       "<b>⚠ This photo's time can't be trusted to the second</b> (the phone camera didn't record it). Retake it with the in-app camera.";
     showImg(compose(pending.base, stamp(c, pending.t, undefined, pending.exact)).toDataURL("image/jpeg", .85));
     viewer.hidden = false;
-    bar([["✕ Discard", function(){ pending = null; closeViewer(); showNext(c); }],
-         ["📷 Retake", retake],
-         ["✗ Not in sync", notInSync, "nb-btn bad"]].concat(pending.exact ? [["✓ In sync", function(){ keep(true); }, "nb-next"]] : []));
+    flowBar(pending.exact ? ["✓ Yes, in sync", function(){ keep(true); }] : ["📷 Retake", retake],
+      [["✕ Discard", function(){ pending = null; closeViewer(); showNext(c); }], pending.exact ? ["📷 Retake", retake] : null, ["✗ Not in sync", notInSync, "bad"]].filter(Boolean));
   }
   function notInSync(){
     var c = pending.c;
     vTitle.textContent = "✗ " + key(c) + " not in sync";
     vSub.innerHTML = "Set the camera's clock (phone app like SnapBridge, or the camera's date/time menu), shoot the clock again, then <b>retake</b> this photo.";
-    bar([["↩ Back", openReview], ["Keep anyway", function(){ keep(false); }, "nb-btn bad"], ["📷 Retake", retake, "nb-next"]]);
+    flowBar(["📷 Retake", retake], [["↩ Back", openReview], ["Keep anyway", function(){ keep(false); }, "bad"]]);
   }
   function retake(){ var c = pending ? pending.c : act(); closeViewer(); bannerCam = c; takePhoto(); }
   function keep(sync){
@@ -1263,7 +1330,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     compose(pending.base, stamp(c, t, sync, pending.exact), sync).toBlob(function(b){
       if(!b) return;
       var name = (camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg";
-      var rec = {day: ev.day, name: name, blob: b, cam: key(c), sync: sync};
+      var rec = {day: ev.day, name: name, blob: b, cam: key(c), sync: sync, atomic: synced};
       photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null;
       updateSend(); closeViewer(); setActive(key(c)); showNext(c);
     }, "image/jpeg", 0.85);
@@ -1277,6 +1344,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     vSub.innerHTML = CHECK;
     showImg(""); viewUrl = URL.createObjectURL(rec.blob); viewImg.src = viewUrl;
     viewer.hidden = false;
+    vBar.className = "view-bar";
     bar([["📷 Retake", function(){ closeViewer(); sendView.hidden = true; bannerCam = c; setActive(key(c)); takePhoto(); }],
          [from === "send" ? "↩ Back to list" : "Close", closeViewer, "nb-next"]]);
   }
@@ -1351,19 +1419,13 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     });
   }
   // Step back from the banner: reopen this camera's check (untick there), or clear everything
-  document.getElementById("nbBack").addEventListener("click", function(){ var c = bannerCam; hideNext(); if(c){ setActive(key(c)); openSheet(); } });
   // Start over just one camera: its ticks and its photo; other cameras are untouched
   function resetCam(c){
-    var k = photoKey(c); ticksOf(c).fill(false);
+    var k = photoKey(c); ticksOf(c).fill(false); delete shotClock[k]; delete skipped[k];
     delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     save(); updateSend(); refresh();
   }
-  twoTap(document.getElementById("nbClear"), "Start over", "Sure?", function(){
-    var c = bannerCam; hideNext(); if(!c) return;
-    setActive(key(c)); resetCam(c); openSheet();
-  });
   twoTap(document.getElementById("camOver"), "Start over this camera", "Tap again to clear this camera", function(){ resetCam(act()); });
-  document.getElementById("nbClear").addEventListener("click", function(){ clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 10000); });
   // This camera's photo in the check sheet: see it, retake or delete it
   var photoRow = document.getElementById("photoRow"), photoThumb = document.getElementById("photoThumb"), thumbUrl = null;
   function renderPhotoRow(){
@@ -1383,7 +1445,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     updateSend(); renderPhotoRow();
   });
-  function clearAll(){ ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
+  function clearAll(){ shotClock = {}; skipped = {}; ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
   twoTap(document.getElementById("newEvent"), "Clear all cameras", "Tap again to clear every camera", clearAll);
   // Same, from the main screen next to Sync now (ticks and photos of every camera; cameras and initials stay)
   twoTap(document.getElementById("clearMain"), "Clear all", "Sure?", clearAll);
