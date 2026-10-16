@@ -344,6 +344,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     </div>
     <div id="recent" class="recent" aria-label="Recently used cameras"></div>
     <ol id="checklist" class="checklist"></ol>
+    <button id="sheetGo" class="fl-go" type="button" hidden></button>
     <div id="photoRow" class="photorow" hidden><img id="photoThumb" alt="Photo of the camera back"><span>Camera-back photo saved</span><button id="photoRetake" class="addbtn" type="button">Retake</button><button id="photoDel" class="addbtn del" type="button">Delete</button></div>
     <p id="sheetNote" class="sheet-note"></p>
     <div class="endrow">
@@ -1029,7 +1030,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       var li = document.createElement("li"), lb = document.createElement("label"), cb = document.createElement("input"), sp = document.createElement("span");
       cb.type = "checkbox"; cb.id = "chk" + i; cb.checked = !!t[i];
       cb.addEventListener("change", function(){
-        t[i] = cb.checked; save(); updateCount(); renderStrips();
+        t[i] = cb.checked; save(); updateCount(); renderStrips(); updateSheetGo();
         if(isDone(a)) setTimeout(function(){ closeSheet(); showNext(a); }, 350);
       });
       sp.innerHTML = '<span class="t"></span><span class="d">' + item[1] + "</span>";
@@ -1037,7 +1038,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       lb.appendChild(cb); lb.appendChild(sp); li.appendChild(lb); listEl.appendChild(li);
     });
     noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks and photos start fresh each new day.";
-    updateCount();
+    updateCount(); updateSheetGo();
   }
   function updateCount(){ updateCam(); }
   function choose(b, m){
@@ -1501,6 +1502,15 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 
   function openSheet(){ hideNext(); sheet.hidden = false; if(rotated) fit(); document.getElementById("sheetClose").focus(); }
   function closeSheet(){ sheet.hidden = true; if(rotated) fit(); var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
+  // All 4 ticked: a big Continue button in the check takes you back into the steps (no need to untick and re-tick)
+  var sheetGo = document.getElementById("sheetGo");
+  function updateSheetGo(){
+    var a = act(), on = isDone(a); sheetGo.hidden = !on; if(!on) return;
+    var st = stepOf(a);
+    sheetGo.textContent = st === 1 ? "Continue: shoot the clock →" : st === 2 ? "Continue: photo of the screen →" : "Continue →";
+  }
+  sheetGo.addEventListener("click", function(){ var a = act(); closeSheet(); showNext(a); });
+  document.getElementById("sheetClose").addEventListener("click", function(){ var a = act(); if(isDone(a)) showNext(a); });
   document.getElementById("sheetClose").addEventListener("click", closeSheet);
   sheet.addEventListener("click", function(e){ if(e.target === sheet) closeSheet(); });
   document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !sheet.hidden) closeSheet(); });
