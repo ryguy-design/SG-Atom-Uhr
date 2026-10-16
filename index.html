@@ -73,7 +73,14 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 main{cursor:pointer}
 .taphint{font-size:.72rem; color:var(--muted); opacity:.55; text-align:center; margin:0 0 .45rem}
 .showhint{display:none; position:fixed; left:0; right:0; bottom:max(14px,env(safe-area-inset-bottom,0px)); font-size:.72rem; color:var(--muted); opacity:.45; text-align:center; pointer-events:none}
-body.photo footer, body.photo .taphint{display:none}
+body.photo footer, body.photo .taphint, body.photo .rotbtn{display:none}
+/* Rotate icon, top-right corner; turns the whole app 90° even with the phone's rotation lock on */
+.rotbtn{position:fixed; z-index:5; top:max(10px,env(safe-area-inset-top,0px)); right:max(10px,env(safe-area-inset-right,0px));
+  width:2.6rem; height:2.6rem; display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+  background:transparent; border:1.5px solid #3a444b; border-radius:50%; color:var(--muted)}
+.rotbtn svg{width:1.45rem; height:1.45rem; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+.rotbtn[aria-pressed="true"]{color:var(--fg); border-color:var(--fg)}
+.rotbtn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 body.photo .showhint{display:block}
 #status{display:flex; flex-direction:column; gap:.15rem; min-width:0}
 #syncText{color:var(--muted)}
@@ -188,6 +195,9 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </head>
 <body>
 
+<button id="rotBtn" class="rotbtn" type="button" aria-pressed="false" aria-label="Rotate screen" title="Rotate screen">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="3" width="9" height="15" rx="1.8"/><line x1="10.8" y1="15.4" x2="13.2" y2="15.4"/><path d="M3.5 13.5a8.5 8.5 0 0 0 7 7.3"/><path d="M8.2 20.9l2.3-.1-.6-2.2"/><path d="M20.5 10.5a8.5 8.5 0 0 0-7-7.3"/><path d="M15.8 3.1l-2.3.1.6 2.2"/></svg>
+</button>
 <main aria-live="off">
   <div class="camwrap">
     <div id="camLabel" class="camlabel" aria-label="Camera"></div>
@@ -215,7 +225,6 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   </div>
   <div class="controls">
     <button id="resync" type="button">Sync now</button>
-    <button id="rotBtn" type="button" aria-pressed="false">Rotate</button>
     <label class="switch" for="locToggle">
       <span>Location</span>
       <input id="locToggle" type="checkbox" role="switch" aria-controls="place">
