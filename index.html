@@ -237,6 +237,9 @@ html.narrow .nb-next{font-size:.92rem; padding:.5rem .7rem}
 .cam-clock{position:absolute; left:50%; bottom:.6rem; transform:translateX(-50%); font:700 1rem/1 var(--sans); font-variant-numeric:tabular-nums; color:#fff; background:rgba(0,0,0,.55); padding:.3rem .6rem; border-radius:999px}
 .cam-bar{display:flex; align-items:center; justify-content:space-between; gap:.6rem; background:#151b1f;
   padding-block:.9rem max(.9rem, env(safe-area-inset-bottom,0px)); padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.cam-msg{position:absolute; inset:auto 1rem 3rem; display:flex; flex-direction:column; gap:.5rem; background:rgba(21,27,31,.95); border-radius:12px; padding:1rem; text-align:center}
+.cam-msg[hidden]{display:none}
+.cam-msg b{font-size:1.05rem} .cam-msg span{font-size:.85rem; color:#c9d1d5}
 .cam-shut{width:4.4rem; height:4.4rem; border-radius:50%; background:#fff; border:5px solid #151b1f; box-shadow:0 0 0 3px #fff; cursor:pointer; flex-shrink:0}
 .cam-shut:active{background:#ccc}
 .cam-shut:focus-visible{outline:2px solid var(--ok); outline-offset:6px}
@@ -350,7 +353,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 <!-- Step 1: the app's own camera, so the shutter moment is known exactly (atomic time) -->
 <div id="cam" class="viewer camview" hidden role="dialog" aria-modal="true" aria-label="Photo of the camera back">
   <div class="view-top"><b id="camTitle"></b><span>Fill the frame with the camera's screen, then tap the shutter.</span></div>
-  <div class="cam-box"><video id="camVid" autoplay playsinline muted></video><div id="camClock" class="cam-clock"></div></div>
+  <div class="cam-box"><video id="camVid" autoplay playsinline muted></video><div id="camClock" class="cam-clock"></div>
+    <div id="camMsg" class="cam-msg" hidden><b>Camera didn't start</b><span>Allow camera access for this app, or use the phone camera.</span><button id="camRetry" class="fl-go" type="button">↻ Try again</button></div></div>
   <div class="cam-bar">
     <button id="camCancel" class="nb-btn" type="button">✕ Cancel</button>
     <button id="camShut" class="cam-shut" type="button" aria-label="Take photo"></button>
@@ -1177,36 +1181,63 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 
   // ---- Step 1a: the in-app camera. The shutter moment is read straight from the atomic clock ----
   var camEl = document.getElementById("cam"), camVid = document.getElementById("camVid"), camClock = document.getElementById("camClock"), stream = null, camTick = null;
+  // The camera stays running between a photo and a retake (asking the phone for it again right after
+  // letting go can give a black screen). It's released once the photo is kept or discarded, or after 2 min.
+  var camWatch = null, camIdle = null, camMsg = document.getElementById("camMsg");
+  function streamLive(){ return stream && stream.getVideoTracks().some(function(t){ return t.readyState === "live"; }); }
+  function stopStream(){
+    clearTimeout(camIdle);
+    if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; lastStop = Date.now(); }
+    camVid.srcObject = null;
+  }
+  var lastStop = 0;
+  function startStream(){
+    camMsg.hidden = true; clearTimeout(camWatch);
+    if(streamLive()){ if(camVid.srcObject !== stream) camVid.srcObject = stream; camVid.play().catch(function(){}); watch(); return; }
+    stopStream();
+    // Give the phone a moment to release the camera if it was just let go
+    var wait = Math.max(0, 600 - (Date.now() - lastStop));
+    setTimeout(function(){ if(!camEl.hidden) request(); }, wait);
+  }
+  function request(){
+    navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: "environment"}, width: {ideal: 3840}, height: {ideal: 2160}}})
+      .then(function(st){
+        if(camEl.hidden){ st.getTracks().forEach(function(t){ t.stop(); }); return; }   // closed meanwhile
+        stream = st; camVid.srcObject = st; camVid.play().catch(function(){}); watch();
+      })
+      .catch(function(){ camMsg.hidden = false; });
+  }
+  // No picture within 3 s: say so and offer to try again, instead of a black screen
+  function watch(){ clearTimeout(camWatch); camWatch = setTimeout(function(){ if(!camEl.hidden && !camVid.videoWidth) camMsg.hidden = false; }, 3000); }
   function takePhoto(){
     var c = bannerCam || act(); bannerCam = c; hideNext();
     if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ photoIn.value = ""; photoIn.click(); return; }
     document.getElementById("camTitle").textContent = "📷 " + key(c) + ": photo of the camera's screen";
-    camEl.hidden = false;
-    navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: "environment"}, width: {ideal: 3840}, height: {ideal: 2160}}})
-      .then(function(st){
-        stream = st; camVid.srcObject = st; camVid.play().catch(function(){});
-        clearInterval(camTick);
-        camTick = setInterval(function(){ var t = new Date(Date.now() + offset); camClock.textContent = p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) + (synced ? " atomic" : " phone clock"); }, 100);
-      })
-      .catch(function(){ closeCam(); photoIn.value = ""; photoIn.click(); });   // no camera permission: use the phone's camera app
+    camEl.hidden = false; clearTimeout(camIdle);
+    clearInterval(camTick);
+    var tick = function(){ var t = new Date(Date.now() + offset); camClock.textContent = p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) + (synced ? " atomic" : " phone clock"); };
+    tick(); camTick = setInterval(tick, 100);
+    startStream();
   }
-  function closeCam(){
-    camEl.hidden = true; clearInterval(camTick);
-    if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
-    camVid.srcObject = null;
+  // Hide the viewfinder; keep the camera warm for a retake unless told to release it
+  function closeCam(release){
+    camEl.hidden = true; clearInterval(camTick); clearTimeout(camWatch); camMsg.hidden = true;
+    if(release) stopStream(); else { clearTimeout(camIdle); camIdle = setTimeout(stopStream, 2*60*1000); }
   }
+  document.getElementById("camRetry").addEventListener("click", function(){ stopStream(); startStream(); });
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState !== "visible" && camEl.hidden) stopStream(); });
   document.getElementById("camShut").addEventListener("click", function(){
     var at = Date.now();                       // the shutter moment, on the phone clock; + offset = atomic
-    var w = camVid.videoWidth, h = camVid.videoHeight; if(!w || !h) return;
+    var w = camVid.videoWidth, h = camVid.videoHeight; if(!w || !h){ camMsg.hidden = false; return; }
     var k = Math.min(1, 1600 / Math.max(w, h));
     var base = document.createElement("canvas"); base.width = Math.round(w * k); base.height = Math.round(h * k);
     base.getContext("2d").drawImage(camVid, 0, 0, base.width, base.height);
-    var c = bannerCam || act(); closeCam();
+    var c = bannerCam || act(); closeCam(false);
     pending = {c: c, base: base, t: new Date(at + offset), exact: true};
     setActive(key(c)); hideNext(); openReview();
   });
-  document.getElementById("camCancel").addEventListener("click", function(){ var c = bannerCam; closeCam(); if(c) showNext(c); });
-  document.getElementById("camAlt").addEventListener("click", function(){ closeCam(); photoIn.value = ""; photoIn.click(); });
+  document.getElementById("camCancel").addEventListener("click", function(){ var c = bannerCam; closeCam(true); if(c) showNext(c); });
+  document.getElementById("camAlt").addEventListener("click", function(){ closeCam(true); photoIn.value = ""; photoIn.click(); });
 
   // ---- Step 1b: the phone's camera app (fallback). Time comes from the photo's EXIF. The app shrinks it and adds a strip: who, which camera, atomic time ----
   var pending = null;   // a photo just taken, waiting for review
@@ -1316,7 +1347,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     showImg(compose(pending.base, stamp(c, pending.t, undefined, pending.exact)).toDataURL("image/jpeg", .85));
     viewer.hidden = false;
     flowBar(pending.exact ? ["✓ Yes, in sync", function(){ keep(true); }] : ["📷 Retake", retake],
-      [["✕ Discard", function(){ pending = null; closeViewer(); showNext(c); }], pending.exact ? ["📷 Retake", retake] : null, ["✗ Not in sync", notInSync, "bad"]].filter(Boolean));
+      [["✕ Discard", function(){ pending = null; stopStream(); closeViewer(); showNext(c); }], pending.exact ? ["📷 Retake", retake] : null, ["✗ Not in sync", notInSync, "bad"]].filter(Boolean));
   }
   function notInSync(){
     var c = pending.c;
@@ -1331,7 +1362,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       if(!b) return;
       var name = (camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg";
       var rec = {day: ev.day, name: name, blob: b, cam: key(c), sync: sync, atomic: synced};
-      photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null;
+      photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null; stopStream();
       updateSend(); closeViewer(); setActive(key(c)); showNext(c);
     }, "image/jpeg", 0.85);
   }
@@ -1437,7 +1468,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); takePhoto(); });
   document.addEventListener("keydown", function(e){
     if(e.key !== "Escape") return;
-    if(!camEl.hidden){ e.stopPropagation(); var c = bannerCam; closeCam(); if(c) showNext(c); return; }
+    if(!camEl.hidden){ e.stopPropagation(); var c = bannerCam; closeCam(true); if(c) showNext(c); return; }
     if(!viewer.hidden){ e.stopPropagation(); if(viewFrom === "review"){ pending = null; } closeViewer(); }
     else if(!sendView.hidden){ e.stopPropagation(); sendView.hidden = true; }
   }, true);
