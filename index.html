@@ -180,11 +180,16 @@ body.photo .showhint{display:block}
 .nb-photo{flex-shrink:0; font:inherit; font-size:1.25rem; line-height:1; color:var(--fg); background:transparent; border:2px solid var(--ok); border-radius:10px; padding:.4rem .7rem; cursor:pointer; position:relative}
 .nb-photo.done::after{content:"✓"; position:absolute; top:-.45rem; right:-.45rem; font-size:.7rem; font-weight:900; color:#06210e; background:var(--ok); border-radius:50%; width:1.1rem; height:1.1rem; line-height:1.1rem; text-align:center}
 .nextbar{background:#151b1f}
-.fl-top{display:flex; align-items:center; gap:.6rem}
+.fl-top{display:flex; align-items:center; gap:.4rem}
+.fl-cams{flex:1; min-width:0; display:flex; gap:.35rem; overflow-x:auto; scrollbar-width:none}
+.fl-cams::-webkit-scrollbar{display:none}
+.fl-cams .chip{font-size:.8rem; padding:.25rem .6rem}
+.fl-x.del{font-size:.8rem}
+.fl-x.del.armed{width:auto; padding:0 .6rem; border-radius:999px; background:var(--bad); border-color:var(--bad); color:#fff; font-size:.78rem; font-weight:800}
 .fl-steps{flex:1; display:flex; gap:.35rem}
 .fl-steps i{flex:1; height:5px; border-radius:3px; background:#2a3238}
 .fl-steps i.on{background:var(--ok)} .fl-steps i.cur{background:var(--fg)}
-.fl-x{flex-shrink:0; font:inherit; font-size:.85rem; color:var(--muted); background:none; border:1px solid #3a444b; border-radius:50%; width:1.7rem; height:1.7rem; padding:0; cursor:pointer}
+.fl-x{flex-shrink:0; font:inherit; font-size:.85rem; color:var(--muted); background:none; border:1px solid #3a444b; border-radius:50%; width:2rem; height:2rem; padding:0; cursor:pointer}
 .fl-kick{font-size:.7rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:.15rem}
 .fl-kick:empty,.fl-head:empty,.fl-sub:empty{display:none}
 .fl-head{font-size:1.1rem; font-weight:800; color:var(--fg)}
@@ -328,7 +333,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       <div class="addrow">
         <button id="addHC" class="addbtn" type="button">+ Hand cam</button>
         <button id="addLS" class="addbtn" type="button">+ LS</button>
-        <button id="removeCam" class="linkbtn" type="button">Remove this camera</button>
+        <button id="removeCam" class="linkbtn" type="button">🗑 Delete this camera</button>
       </div>
     </div>
     <div class="pick">
@@ -378,7 +383,11 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 
 <!-- After a camera's 4 ticks: one step at a time, one big button per step -->
 <div id="nextBar" class="nextbar" hidden role="region" aria-label="Camera steps">
-  <div class="fl-top"><div id="flSteps" class="fl-steps"><i></i><i></i><i></i></div><button id="flX" class="fl-x" type="button" aria-label="Hide">✕</button></div>
+  <div class="fl-top"><div id="flCams" class="fl-cams" aria-label="Cameras"></div>
+    <button id="flEdit" class="fl-x" type="button" aria-label="Edit this camera" title="Edit camera">✎</button>
+    <button id="flDel" class="fl-x del" type="button" aria-label="Delete this camera" title="Delete camera">🗑</button>
+    <button id="flX" class="fl-x" type="button" aria-label="Hide" title="Hide">✕</button></div>
+  <div id="flSteps" class="fl-steps"><i></i><i></i><i></i></div>
   <div id="flKick" class="fl-kick"></div>
   <div id="flHead" class="fl-head"></div>
   <div id="flSub" class="fl-sub"></div>
@@ -974,7 +983,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     }
     document.getElementById("addHC").disabled = hc >= MAXN;
     document.getElementById("addLS").disabled = ls >= MAXN;
-    document.getElementById("removeCam").hidden = kit.cams.length < 2;
+    document.getElementById("removeCam").hidden = false;
   }
   function setActive(k){ kit.active = k; save(); hideNext(); refresh(); }
   function refresh(){
@@ -1050,24 +1059,36 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   document.getElementById("addLS").addEventListener("click", function(){ addCam("LS"); });
   // Remove the selected camera, close the gap in numbering (HC1, HC3, HC4 → HC1, HC2, HC3),
   // and select the one before it, so repeated taps remove 4 → 3 → 2 → 1
-  document.getElementById("removeCam").addEventListener("click", function(){
-    if(kit.cams.length < 2) return;
-    var a = act(), type = a.type;
-    var same = kit.cams.filter(function(c){ return c.type === type; });
-    var pos = same.indexOf(a);
+  // Delete a camera: its ticks and photo go; cameras after it are renumbered and keep their own ticks, photos and steps
+  function removeCamera(a){
+    var type = a.type, k0 = photoKey(a);
+    delete photos[k0]; delete shotClock[k0]; delete skipped[k0]; delete at[k0];
+    db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k0); }catch(e){} });
+    if(kit.cams.length < 2){
+      // Last camera: start it fresh instead of leaving none
+      syncEvent(); delete ev.ticks[k0]; a.type = "HAND CAM"; a.n = 1; a.b = ""; a.m = "";
+      kit.active = key(a); save(); updateSend(); hideNext(); refresh(); return;
+    }
+    var same = kit.cams.filter(function(c){ return c.type === type; }), pos = same.indexOf(a);
     kit.cams = kit.cams.filter(function(c){ return c !== a; });
-    syncEvent();
+    syncEvent(); delete ev.ticks[k0];
+    var move = function(obj, o, n){ if(obj[o] !== undefined){ obj[n] = obj[o]; delete obj[o]; } };
     kit.cams.filter(function(c){ return c.type === type; }).forEach(function(c, i){
       var n = i + 1; if(c.n === n) return;
-      // keep this event's ticks with the camera when its number changes
-      var oldK = key(c) + "|" + c.b + "|" + c.m; c.n = n; var newK = key(c) + "|" + c.b + "|" + c.m;
-      if(ev.ticks[oldK]){ ev.ticks[newK] = ev.ticks[oldK]; delete ev.ticks[oldK]; }
+      var oldK = photoKey(c); c.n = n; var newK = photoKey(c);
+      move(ev.ticks, oldK, newK); move(shotClock, oldK, newK); move(skipped, oldK, newK); move(at, oldK, newK);
+      if(photos[oldK]){
+        var rec = photos[oldK]; rec.cam = key(c); photos[newK] = rec; delete photos[oldK];
+        db(function(d){ try{ var st = d.transaction("p","readwrite").objectStore("p"); st.delete(oldK); st.put(rec, newK); }catch(e){} });
+      }
     });
     sortKit();
     var left = kit.cams.filter(function(c){ return c.type === type; });
     var pick = left.length ? left[Math.max(0, pos - 1)] : kit.cams[0];
-    kit.active = key(pick); save(); refresh();
-  });
+    kit.active = key(pick); save(); updateSend(); refresh();
+    return pick;
+  }
+  twoTap(document.getElementById("removeCam"), "🗑 Delete this camera", "Tap again to delete it", function(){ removeCamera(act()); });
 
   // ---- Next-camera prompt ----
   function nextAfter(a){
@@ -1090,6 +1111,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     flThumb.hidden = !o.thumb;
     if(o.thumb){ flThumbUrl = URL.createObjectURL(o.thumb.blob); flThumb.firstChild.src = flThumbUrl; flThumb.lastChild.textContent = o.thumbText; flThumb.classList.toggle("bad", o.thumb.sync !== true); }
     flGo.textContent = o.go[0]; act_go = o.go[1];
+    disarmDel(); renderFlCams();
     flL.textContent = o.l ? o.l[0] : ""; act_l = o.l ? o.l[1] : null; flL.className = "fl-link" + (o.l && o.l[2] ? " " + o.l[2] : "");
     flR.textContent = o.r ? o.r[0] : ""; act_r = o.r ? o.r[1] : null; flR.className = "fl-link" + (o.r && o.r[2] ? " " + o.r[2] : "");
     nextBar.hidden = false;
@@ -1098,6 +1120,26 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   flL.addEventListener("click", function(){ if(act_l) act_l(); });
   flR.addEventListener("click", function(){ if(act_r) act_r(); });
   document.getElementById("flX").addEventListener("click", hideNext);
+  document.getElementById("flEdit").addEventListener("click", function(){ var c = bannerCam || act(); hideNext(); setActive(key(c)); openSheet(); });
+  // Delete from the panel: first tap asks, second deletes
+  var flDel = document.getElementById("flDel"), delT = null;
+  flDel.addEventListener("click", function(){
+    if(!flDel.classList.contains("armed")){ flDel.classList.add("armed"); flDel.textContent = "Delete " + short(bannerCam || act()) + "?"; delT = setTimeout(disarmDel, 4000); return; }
+    disarmDel(); var pick = removeCamera(bannerCam || act());
+    if(pick && isDone(pick)) showNext(pick); else hideNext();
+  });
+  function disarmDel(){ clearTimeout(delT); flDel.classList.remove("armed"); flDel.textContent = "🗑"; }
+  // The panel's own camera row: tap one to go to it (its step if checked, otherwise its check)
+  function renderFlCams(){
+    var box = document.getElementById("flCams"); box.textContent = "";
+    kit.cams.forEach(function(c){
+      box.appendChild(chip(c, function(){
+        if(bannerCam === c){ hideNext(); setActive(key(c)); openSheet(); return; }
+        setActive(key(c)); if(isDone(c)) showNext(c); else { hideNext(); openSheet(); }
+      }));
+    });
+    var cur = box.querySelector(".chip.act"); if(cur && cur.scrollIntoView) cur.scrollIntoView({inline:"nearest", block:"nearest"});
+  }
   flThumb.addEventListener("click", function(){ if(bannerCam) viewSaved(bannerCam, "saved"); });
   function hideNext(){ nextBar.hidden = true; }
   function doneCount(){ var n = 0; kit.cams.forEach(function(c){ if(isDone(c) && (photos[photoKey(c)] || skipped[photoKey(c)])) n++; }); return n; }
