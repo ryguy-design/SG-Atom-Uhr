@@ -209,6 +209,11 @@ body.photo .showhint{display:block}
 .fl-thumb span{font-size:.85rem; font-weight:700; color:var(--ok)}
 .fl-thumb.bad span{color:#f3b5b6}
 .fl-go{margin-top:.35rem; font:inherit; font-size:1.05rem; font-weight:800; color:#06210e; background:var(--ok); border:0; border-radius:12px; padding:.8rem; cursor:pointer}
+.fl-adds{display:flex; gap:.5rem}
+.fl-adds[hidden]{display:none}
+.fl-add{flex:1; font:inherit; font-size:1rem; font-weight:800; color:var(--ok); background:transparent; border:2px solid var(--ok); border-radius:12px; padding:.7rem .5rem; cursor:pointer}
+.fl-add:disabled{opacity:.35; cursor:default}
+.fl-add:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .fl-links{display:flex; justify-content:space-between; gap:1rem; min-height:1.4rem}
 .fl-link{font:inherit; font-size:.82rem; color:var(--muted); background:none; border:0; padding:.2rem 0; text-decoration:underline; text-underline-offset:3px; cursor:pointer}
 .fl-link:empty{visibility:hidden}
@@ -232,6 +237,7 @@ html.narrow .nb-next{font-size:.92rem; padding:.5rem .7rem}
 .photorow img{width:3.2rem; height:3.2rem; object-fit:cover; border-radius:6px; flex-shrink:0; cursor:zoom-in; outline:1.5px solid #3a6b47}
 /* Full-screen review of a camera-back photo: fit to screen, tap for full size and scroll around */
 .viewer{position:fixed; inset:0; z-index:20; background:#000; display:flex; flex-direction:column}
+#viewer{z-index:22} #cam{z-index:24}
 .viewer[hidden]{display:none}
 .view-scroll{flex:1; min-height:0; overflow:auto; display:flex; align-items:center; justify-content:center; -webkit-overflow-scrolling:touch}
 .view-scroll img{max-width:100%; max-height:100%; object-fit:contain; cursor:zoom-in; display:block}
@@ -413,6 +419,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   <div id="flSub" class="fl-sub"></div>
   <button id="flThumb" class="fl-thumb" type="button" hidden><img alt=""><span></span></button>
   <button id="flGo" class="fl-go" type="button"></button>
+  <div id="flAdds" class="fl-adds" hidden><button id="flAddHC" class="fl-add" type="button">+ Add hand cam</button><button id="flAddLS" class="fl-add" type="button">+ Add LS</button></div>
   <div class="fl-links"><button id="flL" class="fl-link" type="button"></button><button id="flR" class="fl-link" type="button"></button></div>
   <input id="photoIn" type="file" accept="image/*" capture="environment" hidden>
 </div>
@@ -1156,6 +1163,11 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     flThumb.hidden = !o.thumb;
     if(o.thumb){ flThumbUrl = URL.createObjectURL(o.thumb.blob); flThumb.firstChild.src = flThumbUrl; flThumb.lastChild.textContent = o.thumbText; flThumb.classList.toggle("bad", o.thumb.sync !== true); }
     flGo.textContent = o.go[0]; act_go = o.go[1];
+    var adds = document.getElementById("flAdds"); adds.hidden = !o.adds;
+    if(o.adds){
+      var hcN = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length;
+      document.getElementById("flAddHC").disabled = hcN >= MAXN; document.getElementById("flAddLS").disabled = kit.cams.length - hcN >= MAXN;
+    }
     disarmDel(); flAdd = false; renderFlCams();
     flL.textContent = o.l ? o.l[0] : ""; act_l = o.l ? o.l[1] : null; flL.className = "fl-link" + (o.l && o.l[2] ? " " + o.l[2] : "");
     flR.textContent = o.r ? o.r[0] : ""; act_r = o.r ? o.r[1] : null; flR.className = "fl-link" + (o.r && o.r[2] ? " " + o.r[2] : "");
@@ -1196,6 +1208,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var cur = box.querySelector(".chip.act"); if(cur && cur.scrollIntoView) cur.scrollIntoView({inline:"nearest", block:"nearest"});
   }
   var flAdd = false;
+  document.getElementById("flAddHC").addEventListener("click", function(){ hideNext(); addFirst("HAND CAM"); });
+  document.getElementById("flAddLS").addEventListener("click", function(){ hideNext(); addFirst("LS"); });
   document.getElementById("flPlus").addEventListener("click", function(){ flAdd = true; renderFlCams(); });
   flThumb.addEventListener("click", function(){ if(bannerCam) viewSaved(bannerCam, "saved"); });
   function hideNext(){ nextBar.hidden = true; }
@@ -1246,7 +1260,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       panel({step: 3, kick: "All " + tot + " camera" + (tot > 1 ? "s" : "") + " done ✓", thumb: rec, thumbText: thumbText,
         head: n ? "Send the photos to your group" : "All set", sub: n ? "You'll see them all once more before they go." : "",
         go: n ? ["Send " + n + " photo" + (n > 1 ? "s" : "") + " →", sendAll] : ["OK", hideNext],
-        l: back});
+        adds: true, l: back});
     }
   }
   // Remember whether the panel was up when a camera button is tapped (second tap opens its check)
@@ -1540,7 +1554,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     sGo.textContent = "Send " + n + " →"; sGo.disabled = !n;
     sendView.hidden = false; sGo.focus();
   }
-  document.getElementById("sBack").addEventListener("click", function(){ sendView.hidden = true; });
+  // Back from the send list returns to the step panel you came from
+  document.getElementById("sBack").addEventListener("click", function(){ sendView.hidden = true; var c = bannerCam; if(c && isDone(c)) showNext(c); });
   sGo.addEventListener("click", function(){
     var list = kit.cams.map(function(c){ return photos[photoKey(c)]; }).filter(Boolean);
     if(!list.length) return;
