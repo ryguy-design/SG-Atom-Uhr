@@ -193,7 +193,17 @@ html.narrow .nb-next{font-size:.92rem; padding:.5rem .7rem}
 .nb-btn:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .photorow{display:flex; align-items:center; gap:.6rem; background:#1d252a; border-radius:10px; padding:.5rem .6rem}
 .photorow[hidden]{display:none}
-.photorow img{width:3.2rem; height:3.2rem; object-fit:cover; border-radius:6px; flex-shrink:0}
+.photorow img{width:3.2rem; height:3.2rem; object-fit:cover; border-radius:6px; flex-shrink:0; cursor:zoom-in; outline:1.5px solid #3a6b47}
+/* Full-screen review of a camera-back photo: fit to screen, tap for full size and scroll around */
+.viewer{position:fixed; inset:0; z-index:20; background:#000; display:flex; flex-direction:column}
+.viewer[hidden]{display:none}
+.view-scroll{flex:1; min-height:0; overflow:auto; display:flex; align-items:center; justify-content:center; -webkit-overflow-scrolling:touch}
+.view-scroll img{max-width:100%; max-height:100%; object-fit:contain; cursor:zoom-in; display:block}
+.view-scroll.zoom{display:block}
+.view-scroll.zoom img{max-width:none; max-height:none; width:auto; height:auto; cursor:zoom-out}
+.view-bar{display:flex; align-items:center; gap:.6rem; background:#12301b; border-top:2px solid var(--ok);
+  padding-block:.7rem max(.7rem, env(safe-area-inset-bottom,0px)); padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.view-hint{flex:1; min-width:0; font-size:.8rem; color:#cfe9d6; text-align:left}
 .photorow span{flex:1; min-width:0; font-weight:700; color:var(--ok); font-size:.9rem}
 .addbtn.del{border-color:var(--bad); color:var(--bad)}
 .addbtn.del.armed{background:var(--bad); color:#fff}
@@ -290,6 +300,15 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       <button id="newEvent" class="resetbtn neutral" type="button">Clear all cameras</button>
       <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
     </div>
+  </div>
+</div>
+
+<div id="viewer" class="viewer" hidden role="dialog" aria-modal="true" aria-label="Camera-back photo">
+  <div id="viewScroll" class="view-scroll"><img id="viewImg" alt="Camera-back photo"></div>
+  <div class="view-bar">
+    <span class="view-hint">Tap photo to zoom</span>
+    <button id="viewRetake" class="nb-btn" type="button">📷 Retake</button>
+    <button id="viewClose" class="nb-next" type="button">Close</button>
   </div>
 </div>
 
@@ -1138,6 +1157,29 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     if(rec){ thumbUrl = URL.createObjectURL(rec.blob); photoThumb.src = thumbUrl; }
   }
   document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); photoIn.value = ""; photoIn.click(); });
+  // Tap the thumbnail to check the photo full screen (is the camera's time readable?)
+  var viewer = document.getElementById("viewer"), viewScroll = document.getElementById("viewScroll"), viewImg = document.getElementById("viewImg");
+  function openViewer(){
+    if(!thumbUrl) return;
+    viewImg.src = thumbUrl; viewScroll.classList.remove("zoom"); viewer.hidden = false;
+    document.getElementById("viewClose").focus();
+  }
+  function closeViewer(){ viewer.hidden = true; viewScroll.classList.remove("zoom"); }
+  photoThumb.addEventListener("click", openViewer);
+  viewImg.addEventListener("click", function(e){
+    // Toggle full size, centred on where you tapped
+    var zoomed = viewScroll.classList.toggle("zoom");
+    if(zoomed){
+      var rx = e.offsetX / viewImg.clientWidth || .5, ry = e.offsetY / viewImg.clientHeight || .5;
+      requestAnimationFrame(function(){
+        viewScroll.scrollLeft = viewImg.naturalWidth * rx - viewScroll.clientWidth / 2;
+        viewScroll.scrollTop = viewImg.naturalHeight * ry - viewScroll.clientHeight / 2;
+      });
+    }
+  });
+  document.getElementById("viewClose").addEventListener("click", closeViewer);
+  document.getElementById("viewRetake").addEventListener("click", function(){ closeViewer(); bannerCam = act(); photoIn.value = ""; photoIn.click(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !viewer.hidden){ e.stopPropagation(); closeViewer(); } }, true);
   twoTap(document.getElementById("photoDel"), "Delete", "Sure?", function(){
     var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     updateSend(); renderPhotoRow();
