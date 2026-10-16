@@ -67,6 +67,7 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
 .cammodel{font-family:var(--sans); font-weight:600; font-size:calc(var(--u)*.2); letter-spacing:.04em; color:var(--muted); white-space:nowrap}
 .cammodel:empty{display:none}
 /* The checked settings, so the sync photo also proves how the camera was set */
+.camset:empty{display:none}
 .camset{font-family:var(--sans); font-weight:700; font-size:calc(var(--u)*.17); letter-spacing:.03em; white-space:nowrap; color:var(--bad)}
 .camset.ok{color:var(--ok)}
 /* Photo mode: tap the clock to hide everything else */
@@ -686,12 +687,12 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     camInit.value = camInit.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
     var a = act(), parts = [];
     if(camInit.value) parts.push(camInit.value);
-    parts.push(a.type + " " + a.n);
+    if(!kit.empty) parts.push(a.type + " " + a.n);
     camLabelEl.textContent = parts.join(" · ");
     document.getElementById("camModel").textContent =
       !findCam(a.b, a.m) ? "" : a.m === OTHER ? (a.b === "Other" ? "Other camera" : "Other " + a.b + " model") : a.b + " " + shortName(a.m);
     var setEl = document.getElementById("camSet"), cc = findCam(a.b, a.m), n = countOf(a);
-    setEl.textContent = n === 4 ? "✓ " + summary(a.b, cc) : "CAMERA CHECK " + n + "/4 — NOT DONE";
+    setEl.textContent = kit.empty ? "" : n === 4 ? "✓ " + summary(a.b, cc) : "CAMERA CHECK " + n + "/4 — NOT DONE";
     setEl.className = "camset" + (n === 4 ? " ok" : "");
     try{
       var old = JSON.parse(localStorage.getItem("acCam") || "{}"); old.i = camInit.value;
@@ -920,10 +921,12 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     try{ old = JSON.parse(localStorage.getItem("acCam") || "{}"); om = JSON.parse(localStorage.getItem("acModel") || "{}"); }catch(e){}
     var ok = om.b && findCam(om.b, om.m);
     var c = {type: old.t === "LS" ? "LS" : "HAND CAM", n: Math.min(MAXN, Math.max(1, +old.n || 1)), b: ok ? om.b : "", m: ok ? om.m : ""};
-    return {cams:[c], active:key(c)};
+    return {cams:[c], active:key(c), empty: !ok};
   }
   try{ kit = JSON.parse(localStorage.getItem("acKit") || "null"); }catch(e){ kit = null; }
   if(!kit || !kit.cams || !kit.cams.length) kit = defaultKit();
+  // A single camera that was never set up counts as "no cameras yet": only the + shows
+  if(kit.cams.length === 1 && !kit.cams[0].b && kit.empty === undefined) kit.empty = true;
   kit.cams.forEach(function(c){ if(c.b && !findCam(c.b, c.m)) c.m = ""; });
   sortKit();
   try{ recent = JSON.parse(localStorage.getItem("acRecent") || "[]").filter(function(r){ return findCam(r.b, r.m); }); }catch(e){}
@@ -963,6 +966,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function renderStrips(){
     stripEl.textContent = ""; tabsEl.textContent = "";
     kit.cams.forEach(function(c){
+      if(kit.empty) return;
       stripEl.appendChild(chip(c, function(){
         addOpen = false; var was = key(c) === kit.active, up = bannerWasUp; setActive(key(c));
         if(!isDone(c)) openSheet();
@@ -971,7 +975,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       }));
       tabsEl.appendChild(chip(c, function(){ setActive(key(c)); }));
     });
-    var hc = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.cams.length - hc;
+    var hc = kit.empty ? 0 : kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.empty ? 0 : kit.cams.length - hc;
     // "+" on the main screen: tap to choose Hand cam or LS, then that camera's setup opens
     if(hc < MAXN || ls < MAXN){
       if(!addOpen){
@@ -1051,6 +1055,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 
   // ---- Add / remove cameras ----
   function addCam(type){
+    if(kit.empty){ var c0 = kit.cams[0]; c0.type = type; c0.n = 1; c0.b = ""; c0.m = ""; kit.empty = false; kit.active = key(c0); save(); refresh(); return; }
     var used = kit.cams.filter(function(c){ return c.type === type; }).map(function(c){ return c.n; });
     for(var n = 1; n <= MAXN; n++) if(used.indexOf(n) < 0) break;
     if(n > MAXN) return;
@@ -1067,7 +1072,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k0); }catch(e){} });
     if(kit.cams.length < 2){
       // Last camera: start it fresh instead of leaving none
-      syncEvent(); delete ev.ticks[k0]; a.type = "HAND CAM"; a.n = 1; a.b = ""; a.m = "";
+      syncEvent(); delete ev.ticks[k0]; a.type = "HAND CAM"; a.n = 1; a.b = ""; a.m = ""; kit.empty = true;
       kit.active = key(a); save(); updateSend(); hideNext(); refresh(); return;
     }
     var same = kit.cams.filter(function(c){ return c.type === type; }), pos = same.indexOf(a);
