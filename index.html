@@ -1057,16 +1057,20 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       var cv = document.createElement("canvas"); cv.width = w; cv.height = h + bar;
       var g = cv.getContext("2d"); g.drawImage(img, 0, 0, w, h);
       g.fillStyle = "#000"; g.fillRect(0, h, w, bar);
-      var t = new Date(Date.now() + offset), p2 = function(n){ return (n < 10 ? "0" : "") + n; };
+      // When the phone photo was taken, on atomic time: the file's own timestamp (phone clock)
+      // corrected by the atomic offset; if that stamp looks wrong, the moment it came back to the app
+      var lm = f.lastModified, ref = (lm && Math.abs(Date.now() - lm) < 10*60*1000) ? lm : Date.now();
+      var t = new Date(ref + offset), p2 = function(n){ return (n < 10 ? "0" : "") + n; };
       var label = [camInit.value, key(c), findCam(c.b, c.m) ? (c.m === OTHER ? "Other " + c.b : c.b + " " + shortName(c.m)) : "", "✓ " + countOf(c) + "/4",
-        p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + " " + p2(t.getHours()) + ":" + p2(t.getMinutes())].filter(Boolean).join("  ·  ");
+        p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + "  " + p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) +
+        (synced ? " atomic" : " phone clock, not synced")].filter(Boolean).join("  ·  ");
       var fs = Math.round(bar * 0.48); g.font = "700 " + fs + "px system-ui, -apple-system, Roboto, sans-serif";
       while(g.measureText(label).width > w * 0.95 && fs > 8){ fs--; g.font = "700 " + fs + "px system-ui, -apple-system, Roboto, sans-serif"; }
       g.fillStyle = "#fff"; g.textBaseline = "middle"; g.fillText(label, Math.round(bar * 0.35), h + bar / 2);
       URL.revokeObjectURL(url);
       cv.toBlob(function(b){
         if(!b) return;
-        var name = ((camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + ".jpg");
+        var name = ((camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg");
         var rec = {day: ev.day, name: name, blob: b, cam: key(c)};
         photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); updateSend();
         setActive(key(c)); showNext(c);
