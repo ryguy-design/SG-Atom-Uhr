@@ -210,6 +210,15 @@ html.narrow .nb-next{font-size:.92rem; padding:.5rem .7rem}
 .view-top b{font-size:1.05rem}
 .view-top span{font-size:.88rem; color:#c9d1d5; line-height:1.35}
 .view-top span b{font-size:inherit; color:var(--fg)}
+.cam-box{flex:1; min-height:0; position:relative; background:#000; display:flex; align-items:center; justify-content:center; overflow:hidden}
+.cam-box video{width:100%; height:100%; object-fit:contain}
+.cam-clock{position:absolute; left:50%; bottom:.6rem; transform:translateX(-50%); font:700 1rem/1 var(--sans); font-variant-numeric:tabular-nums; color:#fff; background:rgba(0,0,0,.55); padding:.3rem .6rem; border-radius:999px}
+.cam-bar{display:flex; align-items:center; justify-content:space-between; gap:.6rem; background:#151b1f;
+  padding-block:.9rem max(.9rem, env(safe-area-inset-bottom,0px)); padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.cam-shut{width:4.4rem; height:4.4rem; border-radius:50%; background:#fff; border:5px solid #151b1f; box-shadow:0 0 0 3px #fff; cursor:pointer; flex-shrink:0}
+.cam-shut:active{background:#ccc}
+.cam-shut:focus-visible{outline:2px solid var(--ok); outline-offset:6px}
+.cam-bar .nb-btn{min-width:6.5rem}
 .send-list{flex:1; min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(9rem, 1fr)); gap:.7rem; padding:1rem; align-content:start}
 .send-item{display:flex; flex-direction:column; gap:.3rem; background:#1d252a; border-radius:10px; padding:.5rem; text-align:left; font:inherit; color:var(--fg); border:0; cursor:zoom-in}
 .send-item img{width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:6px}
@@ -313,6 +322,17 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       <button id="newEvent" class="resetbtn neutral" type="button">Clear all cameras</button>
       <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
     </div>
+  </div>
+</div>
+
+<!-- Step 1: the app's own camera, so the shutter moment is known exactly (atomic time) -->
+<div id="cam" class="viewer camview" hidden role="dialog" aria-modal="true" aria-label="Photo of the camera back">
+  <div class="view-top"><b id="camTitle"></b><span>Fill the frame with the camera's screen, then tap the shutter.</span></div>
+  <div class="cam-box"><video id="camVid" autoplay playsinline muted></video><div id="camClock" class="cam-clock"></div></div>
+  <div class="cam-bar">
+    <button id="camCancel" class="nb-btn" type="button">✕ Cancel</button>
+    <button id="camShut" class="cam-shut" type="button" aria-label="Take photo"></button>
+    <button id="camAlt" class="nb-btn" type="button">Phone camera</button>
   </div>
 </div>
 
@@ -491,7 +511,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var html = document.documentElement, W = window.innerWidth, H = window.innerHeight;
     // The keyboard and dropdown menus belong to the phone and can't be turned,
     // so the camera check sheet always opens upright; rotation comes back when it closes
-    var sh = document.getElementById("sheet"), rot = rotated && (!sh || sh.hidden);
+    var upright = ["sheet","cam","viewer","sendView"].some(function(id){ var el = document.getElementById(id); return el && !el.hidden; });
+    var rot = rotated && !upright;   // the check, the camera and the photo screens always show upright
     html.classList.toggle("rot", rot);
     html.style.setProperty("--rw", H + "px"); html.style.setProperty("--rh", W + "px");
     var w = rot ? H : W, h = rot ? W : H;
@@ -1089,8 +1110,46 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var n = photoCount(); if(typeof renderPhotoRow === "function" && photoRow) renderPhotoRow();
     sendBtn.hidden = !n; sendBtn.textContent = "📷 Send " + n + " camera photo" + (n > 1 ? "s" : "");
   }
-  nbPhoto.addEventListener("click", function(){ photoIn.value = ""; photoIn.click(); });
-  // ---- Step 1: take the photo. The app shrinks it and adds a strip: who, which camera, atomic time ----
+  nbPhoto.addEventListener("click", function(){ takePhoto(); });
+  // Rotated app: these full screens show upright, so refit whenever one opens or closes
+  if(window.MutationObserver) ["cam","viewer","sendView"].forEach(function(id){
+    new MutationObserver(function(){ if(rotated) fit(); }).observe(document.getElementById(id), {attributes: true, attributeFilter: ["hidden"]});
+  });
+
+  // ---- Step 1a: the in-app camera. The shutter moment is read straight from the atomic clock ----
+  var camEl = document.getElementById("cam"), camVid = document.getElementById("camVid"), camClock = document.getElementById("camClock"), stream = null, camTick = null;
+  function takePhoto(){
+    var c = bannerCam || act(); bannerCam = c; hideNext();
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ photoIn.value = ""; photoIn.click(); return; }
+    document.getElementById("camTitle").textContent = "📷 " + key(c) + ": photo of the camera's screen";
+    camEl.hidden = false;
+    navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: "environment"}, width: {ideal: 3840}, height: {ideal: 2160}}})
+      .then(function(st){
+        stream = st; camVid.srcObject = st; camVid.play().catch(function(){});
+        clearInterval(camTick);
+        camTick = setInterval(function(){ var t = new Date(Date.now() + offset); camClock.textContent = p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) + (synced ? " atomic" : " phone clock"); }, 100);
+      })
+      .catch(function(){ closeCam(); photoIn.value = ""; photoIn.click(); });   // no camera permission: use the phone's camera app
+  }
+  function closeCam(){
+    camEl.hidden = true; clearInterval(camTick);
+    if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    camVid.srcObject = null;
+  }
+  document.getElementById("camShut").addEventListener("click", function(){
+    var at = Date.now();                       // the shutter moment, on the phone clock; + offset = atomic
+    var w = camVid.videoWidth, h = camVid.videoHeight; if(!w || !h) return;
+    var k = Math.min(1, 1600 / Math.max(w, h));
+    var base = document.createElement("canvas"); base.width = Math.round(w * k); base.height = Math.round(h * k);
+    base.getContext("2d").drawImage(camVid, 0, 0, base.width, base.height);
+    var c = bannerCam || act(); closeCam();
+    pending = {c: c, base: base, t: new Date(at + offset), exact: true};
+    setActive(key(c)); hideNext(); openReview();
+  });
+  document.getElementById("camCancel").addEventListener("click", function(){ var c = bannerCam; closeCam(); if(c) showNext(c); });
+  document.getElementById("camAlt").addEventListener("click", function(){ closeCam(); photoIn.value = ""; photoIn.click(); });
+
+  // ---- Step 1b: the phone's camera app (fallback). Time comes from the photo's EXIF. The app shrinks it and adds a strip: who, which camera, atomic time ----
   var pending = null;   // a photo just taken, waiting for review
   function p2(n){ return (n < 10 ? "0" : "") + n; }
   function stamp(c, t, sync, exact){
@@ -1158,7 +1217,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       var base = document.createElement("canvas"); base.width = Math.round(img.width * k); base.height = Math.round(img.height * k);
       base.getContext("2d").drawImage(img, 0, 0, base.width, base.height);
       URL.revokeObjectURL(url);
-      // Shutter moment on the phone's clock, corrected to atomic time. Fallbacks are marked "~" (less exact).
+      // Shutter moment on the phone's clock, corrected to atomic time. Without EXIF it's not exact: marked "~" and flagged in review.
       var ok = function(x){ return x && Math.abs(back - x) < 10*60*1000; }, lm = f.lastModified, ref, exact = true;
       if(ok(shot)) ref = shot; else { ref = ok(lm) ? lm : back; exact = false; }
       pending = {c: c, base: base, t: new Date(ref + offset), exact: exact};
@@ -1184,13 +1243,13 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function openReview(){
     var c = pending.c; viewFrom = "review";
     vTitle.textContent = "📷 " + key(c) + ": is the camera in sync?";
-    vSub.innerHTML = CHECK + " Tap the photo to zoom.";
+    vSub.innerHTML = pending.exact ? CHECK + " Tap the photo to zoom." :
+      "<b>⚠ This photo's time can't be trusted to the second</b> (the phone camera didn't record it). Retake it with the in-app camera.";
     showImg(compose(pending.base, stamp(c, pending.t, undefined, pending.exact)).toDataURL("image/jpeg", .85));
     viewer.hidden = false;
     bar([["✕ Discard", function(){ pending = null; closeViewer(); showNext(c); }],
          ["📷 Retake", retake],
-         ["✗ Not in sync", notInSync, "nb-btn bad"],
-         ["✓ In sync", function(){ keep(true); }, "nb-next"]]);
+         ["✗ Not in sync", notInSync, "nb-btn bad"]].concat(pending.exact ? [["✓ In sync", function(){ keep(true); }, "nb-next"]] : []));
   }
   function notInSync(){
     var c = pending.c;
@@ -1198,7 +1257,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     vSub.innerHTML = "Set the camera's clock (phone app like SnapBridge, or the camera's date/time menu), shoot the clock again, then <b>retake</b> this photo.";
     bar([["↩ Back", openReview], ["Keep anyway", function(){ keep(false); }, "nb-btn bad"], ["📷 Retake", retake, "nb-next"]]);
   }
-  function retake(){ var c = pending ? pending.c : act(); closeViewer(); bannerCam = c; photoIn.value = ""; photoIn.click(); }
+  function retake(){ var c = pending ? pending.c : act(); closeViewer(); bannerCam = c; takePhoto(); }
   function keep(sync){
     var c = pending.c, t = pending.t;
     compose(pending.base, stamp(c, t, sync, pending.exact), sync).toBlob(function(b){
@@ -1218,7 +1277,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     vSub.innerHTML = CHECK;
     showImg(""); viewUrl = URL.createObjectURL(rec.blob); viewImg.src = viewUrl;
     viewer.hidden = false;
-    bar([["📷 Retake", function(){ closeViewer(); sendView.hidden = true; bannerCam = c; setActive(key(c)); photoIn.value = ""; photoIn.click(); }],
+    bar([["📷 Retake", function(){ closeViewer(); sendView.hidden = true; bannerCam = c; setActive(key(c)); takePhoto(); }],
          [from === "send" ? "↩ Back to list" : "Close", closeViewer, "nb-next"]]);
   }
   document.getElementById("photoThumb").addEventListener("click", function(){ viewSaved(act(), "saved"); });
@@ -1313,9 +1372,10 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     if(thumbUrl){ URL.revokeObjectURL(thumbUrl); thumbUrl = null; }
     if(rec){ thumbUrl = URL.createObjectURL(rec.blob); photoThumb.src = thumbUrl; }
   }
-  document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); photoIn.value = ""; photoIn.click(); });
+  document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); takePhoto(); });
   document.addEventListener("keydown", function(e){
     if(e.key !== "Escape") return;
+    if(!camEl.hidden){ e.stopPropagation(); var c = bannerCam; closeCam(); if(c) showNext(c); return; }
     if(!viewer.hidden){ e.stopPropagation(); if(viewFrom === "review"){ pending = null; } closeViewer(); }
     else if(!sendView.hidden){ e.stopPropagation(); sendView.hidden = true; }
   }, true);
