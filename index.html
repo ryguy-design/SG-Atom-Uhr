@@ -192,6 +192,8 @@ body.photo .showhint{display:block}
 .fl-cams::-webkit-scrollbar{display:none}
 .fl-cams .chip{font-size:.8rem; padding:.25rem .6rem}
 .fl-x.del{font-size:.8rem}
+.fl-x.plus{border:2px dashed #56626a; border-radius:10px; color:var(--fg); font-size:1.1rem; font-weight:700}
+.fl-x.plus[hidden]{display:none}
 .fl-x.del.armed{width:auto; padding:0 .6rem; border-radius:999px; background:var(--bad); border-color:var(--bad); color:#fff; font-size:.78rem; font-weight:800}
 .fl-steps{flex:1; display:flex; gap:.35rem}
 .fl-steps i{flex:1; height:5px; border-radius:3px; background:#2a3238}
@@ -401,6 +403,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 
 <div id="nextBar" class="nextbar" hidden role="region" aria-label="Camera steps">
   <div class="fl-top"><div id="flCams" class="fl-cams" aria-label="Cameras"></div>
+    <button id="flPlus" class="fl-x plus" type="button" aria-label="Add a camera" title="Add camera">+</button>
     <button id="flEdit" class="fl-x" type="button" aria-label="Edit this camera" title="Edit camera">✎</button>
     <button id="flDel" class="fl-x del" type="button" aria-label="Delete this camera" title="Delete camera">🗑</button>
     <button id="flX" class="fl-x" type="button" aria-label="Hide" title="Hide">✕</button></div>
@@ -1153,7 +1156,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     flThumb.hidden = !o.thumb;
     if(o.thumb){ flThumbUrl = URL.createObjectURL(o.thumb.blob); flThumb.firstChild.src = flThumbUrl; flThumb.lastChild.textContent = o.thumbText; flThumb.classList.toggle("bad", o.thumb.sync !== true); }
     flGo.textContent = o.go[0]; act_go = o.go[1];
-    disarmDel(); renderFlCams();
+    disarmDel(); flAdd = false; renderFlCams();
     flL.textContent = o.l ? o.l[0] : ""; act_l = o.l ? o.l[1] : null; flL.className = "fl-link" + (o.l && o.l[2] ? " " + o.l[2] : "");
     flR.textContent = o.r ? o.r[0] : ""; act_r = o.r ? o.r[1] : null; flR.className = "fl-link" + (o.r && o.r[2] ? " " + o.r[2] : "");
     nextBar.hidden = false;
@@ -1180,8 +1183,20 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
         setActive(key(c)); if(isDone(c)) showNext(c); else { hideNext(); openSheet(); }
       }));
     });
+    var hc = kit.cams.filter(function(c){ return c.type === "HAND CAM"; }).length, ls = kit.cams.length - hc;
+    document.getElementById("flPlus").hidden = flAdd || (hc >= MAXN && ls >= MAXN);
+    if(flAdd){
+      // + tapped: the row shows the choices instead of the cameras (✕ to back out)
+      box.textContent = "";
+      box.appendChild(addChip("+ Hand cam", "plusopt", function(){ flAdd = false; hideNext(); addFirst("HAND CAM"); }, hc >= MAXN));
+      box.appendChild(addChip("+ LS", "plusopt", function(){ flAdd = false; hideNext(); addFirst("LS"); }, ls >= MAXN));
+      box.appendChild(addChip("✕", "plus", function(){ flAdd = false; renderFlCams(); }));
+      return;
+    }
     var cur = box.querySelector(".chip.act"); if(cur && cur.scrollIntoView) cur.scrollIntoView({inline:"nearest", block:"nearest"});
   }
+  var flAdd = false;
+  document.getElementById("flPlus").addEventListener("click", function(){ flAdd = true; renderFlCams(); });
   flThumb.addEventListener("click", function(){ if(bannerCam) viewSaved(bannerCam, "saved"); });
   function hideNext(){ nextBar.hidden = true; }
   function doneCount(){ var n = 0; kit.cams.forEach(function(c){ if(isDone(c) && (photos[photoKey(c)] || skipped[photoKey(c)])) n++; }); return n; }
