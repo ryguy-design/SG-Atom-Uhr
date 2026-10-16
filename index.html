@@ -309,7 +309,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </head>
 <body>
 
-<div id="visits" class="visits" hidden aria-label="Visits"></div>
+<div id="visits" class="visits" hidden aria-label="Users"></div>
 <button id="rotBtn" class="rotbtn" type="button" aria-pressed="false" aria-label="Rotate screen" title="Rotate screen">
   <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="3" width="9" height="15" rx="1.8"/><line x1="10.8" y1="15.4" x2="13.2" y2="15.4"/><path d="M3.5 13.5a8.5 8.5 0 0 0 7 7.3"/><path d="M8.2 20.9l2.3-.1-.6-2.2"/><path d="M20.5 10.5a8.5 8.5 0 0 0-7-7.3"/><path d="M15.8 3.1l-2.3.1.6 2.2"/></svg>
 </button>
@@ -440,18 +440,26 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </div>
 
 <script>
-// Visit counter (GoatCounter, no cookies). Site code below; the number shows once the counter is allowed in its settings.
-var GC_CODE = "sgatomuhr";
+// User counter: a free, no-account counting service (Abacus). Each phone is counted once (remembered on the phone),
+// and every app open is counted separately. Nothing personal is sent. If the service is down the counter just hides.
 (function(){
-  var sc = document.createElement("script"); sc.async = true; sc.src = "https://gc.zgo.at/count.js";
-  sc.setAttribute("data-goatcounter", "https://" + GC_CODE + ".goatcounter.com/count"); document.head.appendChild(sc);
-  function show(){
-    fetch("https://" + GC_CODE + ".goatcounter.com/counter/TOTAL.json").then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
-      var el = document.getElementById("visits"); if(!el || !j || !j.count) return;
-      el.textContent = "👁 " + j.count + " visits"; el.hidden = false;
-    }).catch(function(){});
+  var API = "https://abacus.jasoncameron.dev", NS = "ryguy-sg-atom-uhr";
+  function call(path){ return fetch(API + path).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }); }
+  function val(j){ return j && (j.value != null ? j.value : j.count); }
+  function show(n){
+    var el = document.getElementById("visits"); if(!el || n == null) return;
+    el.textContent = "👥 " + n + (n == 1 ? " user" : " users"); el.hidden = false;
   }
-  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", show); else show();
+  function go(){
+    var first = false; try{ first = !localStorage.getItem("acCounted"); }catch(e){}
+    call("/hit/" + NS + "/opens");
+    (first ? call("/hit/" + NS + "/users") : call("/get/" + NS + "/users")).then(function(j){
+      var n = val(j); if(n == null) return;
+      if(first){ try{ localStorage.setItem("acCounted", "1"); }catch(e){} }
+      show(n);
+    });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", go); else go();
 })();
 (function(){
   function pad(n,w){ n=String(n); while(n.length<(w||2)) n="0"+n; return n; }
