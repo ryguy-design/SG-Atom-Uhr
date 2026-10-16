@@ -1014,7 +1014,16 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   // ---- Ticks belong to one event: they start fresh each new day, or with "New event" ----
   function today(){ var d = new Date(Date.now() + offset); return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate(); }
   try{ ev = JSON.parse(localStorage.getItem("acEvent") || "null"); }catch(e){ ev = null; }
-  function syncEvent(){ if(!ev || ev.day !== today() || !ev.ticks) ev = {day: today(), ticks: {}}; }
+  // When ticks and photos start fresh (cameras and initials always stay):
+  //  - 12 hours after the photos were sent, or
+  //  - if nothing was sent, on the next calendar day
+  var SENT_KEEP = 12 * 60 * 60 * 1000;
+  function evId(){ return ev.id || ev.day; }   // photos belong to one event
+  function syncEvent(){
+    var now = Date.now() + offset;
+    if(!ev || !ev.ticks) ev = {day: today(), ticks: {}, id: String(Date.now())};
+    else if(ev.sentAt ? now - ev.sentAt > SENT_KEEP : ev.day !== today()) ev = {day: today(), ticks: {}, id: String(Date.now())};
+  }
   // A camera's ticks also start over if its brand or model changes
   function ticksOf(c){ syncEvent(); var k = key(c) + "|" + c.b + "|" + c.m; if(!ev.ticks[k]) ev.ticks[k] = [false,false,false,false]; return ev.ticks[k]; }
   function countOf(c){ return findCam(c.b, c.m) ? ticksOf(c).filter(Boolean).length : 0; }
@@ -1121,7 +1130,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       sp.firstChild.textContent = item[0];
       lb.appendChild(cb); lb.appendChild(sp); li.appendChild(lb); listEl.appendChild(li);
     });
-    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks and photos start fresh each new day.";
+    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks and photos start fresh 12 hours after you send the photos (or the next day if nothing was sent).";
     updateCount(); updateSheetGo();
   }
   function updateCount(){ updateCam(); }
@@ -1324,7 +1333,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
         var st = d.transaction("p","readwrite").objectStore("p"), rq = st.openCursor();
         rq.onsuccess = function(){
           var cur = rq.result; if(!cur){ updateSend(); return; }
-          if(cur.value && cur.value.day === ev.day) photos[cur.key] = cur.value; else cur.delete();   // older events are dropped
+          if(cur.value && cur.value.day === evId()) photos[cur.key] = cur.value; else cur.delete();   // older events are dropped
           cur.continue();
         };
       }catch(e){}
@@ -1524,7 +1533,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       var name = (camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg";
       var exact = pending.exact, atomic = pending.saved ? pending.atomic : synced;
       pending.base.toBlob(function(raw){
-        var rec = {day: ev.day, name: name, blob: b, raw: raw, t: t.getTime(), exact: exact, cam: key(c), sync: sync, atomic: atomic};
+        var rec = {day: evId(), name: name, blob: b, raw: raw, t: t.getTime(), exact: exact, cam: key(c), sync: sync, atomic: atomic};
         photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null; stopStream();
         updateSend(); closeViewer(); setActive(key(c)); go(c, 4);
       }, "image/jpeg", 0.9);
@@ -1590,6 +1599,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     sGo.textContent = "Send " + n + " →"; sGo.disabled = !n;
     sendView.hidden = false; sGo.focus();
   }
+  // Sent: start the 12-hour clock (sending again restarts it)
+  function markSent(){ ev.sentAt = Date.now() + offset; save(); }
   // Back from the send list returns to the step panel you came from
   document.getElementById("sBack").addEventListener("click", function(){ sendView.hidden = true; var c = bannerCam; if(c && isDone(c)) showNext(c); });
   sGo.addEventListener("click", function(){
@@ -1598,11 +1609,11 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var files = list.map(function(x){ return new File([x.blob], x.name, {type: "image/jpeg"}); });
     var text = (camInit.value ? camInit.value + " · " : "") + "camera check " + ev.day.split("-").reverse().join(".");
     if(navigator.canShare && navigator.canShare({files: files})){
-      navigator.share({files: files, text: text}).then(function(){ sendView.hidden = true; }).catch(function(){});
+      navigator.share({files: files, text: text}).then(function(){ markSent(); sendView.hidden = true; }).catch(function(){});
     } else {
       // No share sheet (e.g. desktop): download them instead
       files.forEach(function(f){ var a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
-      sendView.hidden = true;
+      markSent(); sendView.hidden = true;
     }
   });
   sendBtn.addEventListener("click", sendAll);
@@ -1663,14 +1674,14 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     updateSend(); renderPhotoRow();
   });
-  function clearAll(){ shotClock = {}; skipped = {}; at = {}; ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh(); }
+  function clearAll(){ shotClock = {}; skipped = {}; at = {}; ev = {day: today(), ticks: {}, id: String(Date.now())}; save(); hideNext(); dbClear(); refresh(); }
   twoTap(document.getElementById("newEvent"), "Clear all cameras", "Tap again to clear every camera", clearAll);
   // Same, from the main screen next to Sync now (ticks and photos of every camera; cameras and initials stay)
   twoTap(document.getElementById("clearMain"), "Reset app", "Sure? Resets everything", resetApp);
   // Reset the whole app to a fresh start: no cameras, no initials, no ticks or photos, location off, not rotated
   function resetApp(){
     try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc","acRot"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
-    camInit.value = ""; updateInitBtn(); kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = []; dbClear();
+    camInit.value = ""; updateInitBtn(); kit = defaultKit(); ev = {day: today(), ticks: {}, id: String(Date.now())}; recent = []; dbClear();
     shotClock = {}; skipped = {}; at = {};
     save(); hideNext(); refresh();
     showLoc = false; applyLoc();
@@ -1679,7 +1690,10 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   }
 
   // A new day starts a new event: re-check whenever the app comes back to the screen
-  function dayCheck(){ var d = ev && ev.day; syncEvent(); if(ev.day !== d){ save(); hideNext(); dbClear(); refresh(); } }
+  function dayCheck(){
+    var before = ev; syncEvent();
+    if(ev !== before){ shotClock = {}; skipped = {}; at = {}; save(); hideNext(); dbClear(); refresh(); }
+  }
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") dayCheck(); });
   setInterval(dayCheck, 60*1000);   // also clears at midnight while the app stays open
   refresh(); syncEvent(); loadPhotos();
