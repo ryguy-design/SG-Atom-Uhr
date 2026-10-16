@@ -97,6 +97,8 @@ body.photo .showhint{display:block}
 .switch input:checked + .track{background:var(--fg)}
 .switch input:checked + .track .knob{transform:translateX(1rem); background:var(--bg)}
 .controls button.clearmain{color:var(--muted)}
+.controls button.initbtn{font-weight:700; letter-spacing:.04em}
+.camlabel{cursor:pointer}
 .controls button.clearmain.armed{color:#fff; background:var(--bad); border-radius:6px; padding:.3rem .55rem; text-decoration:none}
 .controls button:focus-visible,.switch input:focus-visible + .track{outline:2px solid var(--fg); outline-offset:2px}
 /* Camera settings button + sheet */
@@ -310,6 +312,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     <span id="detail"></span>
   </div>
   <div class="controls">
+    <button id="initBtn" class="initbtn" type="button" aria-label="Edit your initials"></button>
     <button id="resync" type="button">Sync now</button>
     <button id="clearMain" class="clearmain" type="button">Clear all</button>
     <label class="switch" for="locToggle">
@@ -326,9 +329,6 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       <h2 id="sheetTitle">Camera check</h2>
       <button id="sheetClose" type="button">Done</button>
     </div>
-    <label class="initrow">SG initials
-      <input id="camInit" type="text" maxlength="6" placeholder="e.g. RK" autocomplete="off" autocapitalize="characters" spellcheck="false">
-    </label>
     <div class="kit">
       <div id="tabs" class="strip tabs" aria-label="My cameras"></div>
       <div class="addrow">
@@ -384,6 +384,18 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </div>
 
 <!-- After a camera's 4 ticks: one step at a time, one big button per step -->
+<!-- Initials: one photographer for every camera, so they live here, not in each camera's check -->
+<div id="initDlg" class="sheet" hidden>
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="initTitle">
+    <div class="sheet-head"><h2 id="initTitle">Your SG initials</h2></div>
+    <p class="sheet-note" style="margin:0">Shown on the clock for every camera, e.g. RK · HAND CAM 1. Up to 6 letters.</p>
+    <label class="initrow">Initials
+      <input id="camInit" type="text" maxlength="6" placeholder="e.g. RK" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    </label>
+    <div class="endrow"><button id="initCancel" class="resetbtn neutral" type="button">Cancel</button><button id="initSave" class="resetbtn send" type="button">Save</button></div>
+  </div>
+</div>
+
 <div id="nextBar" class="nextbar" hidden role="region" aria-label="Camera steps">
   <div class="fl-top"><div id="flCams" class="fl-cams" aria-label="Cameras"></div>
     <button id="flEdit" class="fl-x" type="button" aria-label="Edit this camera" title="Edit camera">✎</button>
@@ -549,7 +561,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     var html = document.documentElement, W = window.innerWidth, H = window.innerHeight;
     // The keyboard and dropdown menus belong to the phone and can't be turned,
     // so the camera check sheet always opens upright; rotation comes back when it closes
-    var upright = ["sheet","cam","viewer","sendView"].some(function(id){ var el = document.getElementById(id); return el && !el.hidden; });
+    var upright = ["sheet","cam","viewer","sendView","initDlg"].some(function(id){ var el = document.getElementById(id); return el && !el.hidden; });
     var rot = rotated && !upright;   // the check, the camera and the photo screens always show upright
     html.classList.toggle("rot", rot);
     html.style.setProperty("--rw", H + "px"); html.style.setProperty("--rh", W + "px");
@@ -701,8 +713,26 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     fit();
   }
   camInit.addEventListener("input", updateCam);
+  // ---- Initials dialog: asked once with the first camera; edit any time from the label or the bottom row ----
+  var initDlg = document.getElementById("initDlg"), initBtn = document.getElementById("initBtn"), initBefore = "", initThen = null;
+  function updateInitBtn(){ initBtn.textContent = camInit.value ? camInit.value + " ✎" : "Initials ✎"; }
+  function openInit(then){
+    initBefore = camInit.value; initThen = then || null; initDlg.hidden = false;
+    setTimeout(function(){ camInit.focus(); camInit.select(); }, 50);
+  }
+  function closeInit(keep){
+    if(!keep){ camInit.value = initBefore; updateCam(); }
+    initDlg.hidden = true; camInit.blur(); updateInitBtn();
+    var t = initThen; initThen = null; if(t) t();
+  }
+  document.getElementById("initSave").addEventListener("click", function(){ closeInit(true); });
+  document.getElementById("initCancel").addEventListener("click", function(){ closeInit(false); });
+  initDlg.addEventListener("click", function(e){ if(e.target === initDlg) closeInit(false); });
+  initBtn.addEventListener("click", function(){ openInit(); });
+  camLabelEl.addEventListener("click", function(e){ e.stopPropagation(); openInit(); });   // tapping the label doesn't toggle photo mode
+  updateInitBtn();
   // Done typing: drop the keyboard so the clock is fully visible again
-  camInit.addEventListener("keydown", function(e){ if(e.key === "Enter") camInit.blur(); });
+  camInit.addEventListener("keydown", function(e){ if(e.key === "Enter") closeInit(true); });
 
   // ================= Camera settings checklist =================
   // Full frame from 2013, APS-C from 2015, plus Sony RX100 and Canon 60D (used on LS).
@@ -981,8 +1011,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       if(!addOpen){
         stripEl.appendChild(addChip("+", "plus", function(){ addOpen = true; renderStrips(); var e = stripEl.lastChild; if(e && e.scrollIntoView) e.scrollIntoView({inline:"end", block:"nearest"}); }));
       } else {
-        stripEl.appendChild(addChip("+ Hand cam", "plusopt", function(){ addOpen = false; addCam("HAND CAM"); openSheet(); }, hc >= MAXN));
-        stripEl.appendChild(addChip("+ LS", "plusopt", function(){ addOpen = false; addCam("LS"); openSheet(); }, ls >= MAXN));
+        stripEl.appendChild(addChip("+ Hand cam", "plusopt", function(){ addOpen = false; addFirst("HAND CAM"); }, hc >= MAXN));
+        stripEl.appendChild(addChip("+ LS", "plusopt", function(){ addOpen = false; addFirst("LS"); }, ls >= MAXN));
         stripEl.appendChild(addChip("✕", "plus", function(){ addOpen = false; renderStrips(); }));
       }
     }
@@ -1053,6 +1083,8 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   modelSel.addEventListener("change", function(){ choose(act().b, modelSel.value); });
 
   // ---- Add / remove cameras ----
+  // Adding a camera from the main screen; with no initials saved yet, ask for them first
+  function addFirst(type){ addCam(type); if(!camInit.value) openInit(openSheet); else openSheet(); }
   function addCam(type){
     if(kit.empty){ var c0 = kit.cams[0]; c0.type = type; c0.n = 1; c0.b = ""; c0.m = ""; kit.empty = false; kit.active = key(c0); save(); refresh(); return; }
     var used = kit.cams.filter(function(c){ return c.type === type; }).map(function(c){ return c.n; });
@@ -1233,7 +1265,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     sendBtn.hidden = !n; sendBtn.textContent = "📷 Send " + n + " camera photo" + (n > 1 ? "s" : "");
   }
   // Rotated app: these full screens show upright, so refit whenever one opens or closes
-  if(window.MutationObserver) ["cam","viewer","sendView"].forEach(function(id){
+  if(window.MutationObserver) ["cam","viewer","sendView","initDlg"].forEach(function(id){
     new MutationObserver(function(){ if(rotated) fit(); }).observe(document.getElementById(id), {attributes: true, attributeFilter: ["hidden"]});
   });
 
@@ -1551,6 +1583,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); takePhoto(); });
   document.addEventListener("keydown", function(e){
     if(e.key !== "Escape") return;
+    if(!initDlg.hidden){ e.stopPropagation(); closeInit(false); return; }
     if(!camEl.hidden){ e.stopPropagation(); var c = bannerCam; closeCam(true); if(c) showNext(c); return; }
     if(!viewer.hidden){ e.stopPropagation(); if(viewFrom === "review"){ pending = null; } closeViewer(); }
     else if(!sendView.hidden){ e.stopPropagation(); sendView.hidden = true; }
@@ -1565,7 +1598,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   twoTap(document.getElementById("clearMain"), "Clear all", "Sure?", clearAll);
   twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", function(){
     try{ ["acCam","acModel","acRecent","acTicks","acKit","acEvent","acLoc"].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
-    camInit.value = ""; kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = []; dbClear();
+    camInit.value = ""; updateInitBtn(); kit = defaultKit(); ev = {day: today(), ticks: {}}; recent = []; dbClear();
     save(); hideNext(); refresh();
     showLoc = false; applyLoc();
   });
