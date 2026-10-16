@@ -177,6 +177,16 @@ body.photo .showhint{display:block}
 .nb-next:focus-visible,.nb-photo:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
 .nb-photo{flex-shrink:0; font:inherit; font-weight:800; font-size:1rem; color:var(--fg); background:transparent; border:2px solid var(--ok); border-radius:10px; padding:.5rem .8rem; cursor:pointer; white-space:nowrap}
 .nb-photo.done{border-color:#3a6b47; color:#cfe9d6; font-weight:700}
+.nb-links{display:flex; gap:1rem; margin-top:.3rem}
+.nb-link{font:inherit; font-size:.8rem; color:#cfe9d6; background:none; border:0; padding:.15rem 0; text-decoration:underline; text-underline-offset:3px; cursor:pointer}
+.nb-link.armed{color:#fff; background:var(--bad); border-radius:6px; padding:.15rem .5rem; text-decoration:none}
+.nb-link:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+.photorow{display:flex; align-items:center; gap:.6rem; background:#1d252a; border-radius:10px; padding:.5rem .6rem}
+.photorow[hidden]{display:none}
+.photorow img{width:3.2rem; height:3.2rem; object-fit:cover; border-radius:6px; flex-shrink:0}
+.photorow span{flex:1; min-width:0; font-weight:700; color:var(--ok); font-size:.9rem}
+.addbtn.del{border-color:var(--bad); color:var(--bad)}
+.addbtn.del.armed{background:var(--bad); color:#fff}
 .resetbtn.send{color:#06210e; background:var(--ok); border-color:var(--ok)}
 .resetbtn{align-self:center; font:inherit; font-size:.9rem; font-weight:700; color:var(--bad); background:transparent; border:1.5px solid var(--bad); border-radius:999px; padding:.45rem 1.1rem; cursor:pointer; margin-top:.2rem}
 .resetbtn.armed{background:var(--bad); color:#fff}
@@ -261,17 +271,19 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     </div>
     <div id="recent" class="recent" aria-label="Recently used cameras"></div>
     <ol id="checklist" class="checklist"></ol>
+    <div id="photoRow" class="photorow" hidden><img id="photoThumb" alt="Photo of the camera back"><span>Camera-back photo saved</span><button id="photoRetake" class="addbtn" type="button">Retake</button><button id="photoDel" class="addbtn del" type="button">Delete</button></div>
     <p id="sheetNote" class="sheet-note"></p>
     <div class="endrow">
       <button id="sendPhotos" class="resetbtn send" type="button" hidden></button>
-      <button id="newEvent" class="resetbtn neutral" type="button">New event: clear all ticks</button>
+      <button id="newEvent" class="resetbtn neutral" type="button">Start over: clear ticks &amp; photos</button>
       <button id="resetAll" class="resetbtn" type="button">Reset all to default</button>
     </div>
   </div>
 </div>
 
 <div id="nextBar" class="nextbar" hidden role="status">
-  <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span></div>
+  <div class="nb-msg"><b id="nbTitle"></b><span id="nbSub"></span>
+    <span class="nb-links"><button id="nbBack" class="nb-link" type="button">↩ Back to check</button><button id="nbClear" class="nb-link" type="button">Start over</button></span></div>
   <button id="nbPhoto" class="nb-photo" type="button"></button>
   <button id="nbNext" class="nb-next" type="button"></button>
   <input id="photoIn" type="file" accept="image/*" capture="environment" hidden>
@@ -867,7 +879,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function setActive(k){ kit.active = k; save(); hideNext(); refresh(); }
   function refresh(){
     var a = act();
-    brandSel.value = a.b; fillModels(); renderRecent(); renderList(); renderStrips(); updateCam();
+    brandSel.value = a.b; fillModels(); renderRecent(); renderList(); renderStrips(); updateCam(); if(photoRow) renderPhotoRow();
   }
 
   function fillModels(){
@@ -915,7 +927,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       sp.firstChild.textContent = item[0];
       lb.appendChild(cb); lb.appendChild(sp); li.appendChild(lb); listEl.appendChild(li);
     });
-    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks start fresh each new day or with New event.";
+    noteEl.textContent = "Image size is the smallest setting with a long edge of at least 4000 px. Your cameras stay saved; ticks and photos start fresh each new day or with Start over.";
     updateCount();
   }
   function updateCount(){ updateCam(); }
@@ -1019,7 +1031,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     });
   }
   function updateSend(){
-    var n = photoCount();
+    var n = photoCount(); if(typeof renderPhotoRow === "function" && photoRow) renderPhotoRow();
     sendBtn.hidden = !n; sendBtn.textContent = "📷 Send " + n + " camera photo" + (n > 1 ? "s" : "");
   }
   nbPhoto.addEventListener("click", function(){ photoIn.value = ""; photoIn.click(); });
@@ -1084,7 +1096,26 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
       btn.textContent = "Done ✓"; setTimeout(function(){ btn.textContent = label; }, 1800);
     });
   }
-  twoTap(document.getElementById("newEvent"), "New event: clear all ticks", "Tap again to clear all ticks", function(){
+  // Step back from the banner: reopen this camera's check (untick there), or clear everything
+  document.getElementById("nbBack").addEventListener("click", function(){ var c = bannerCam; hideNext(); if(c){ setActive(key(c)); openSheet(); } });
+  twoTap(document.getElementById("nbClear"), "Start over", "Tap again: clear all", function(){
+    ev = {day: today(), ticks: {}}; save(); dbClear(); hideNext(); refresh();
+  });
+  document.getElementById("nbClear").addEventListener("click", function(){ clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 10000); });
+  // This camera's photo in the check sheet: see it, retake or delete it
+  var photoRow = document.getElementById("photoRow"), photoThumb = document.getElementById("photoThumb"), thumbUrl = null;
+  function renderPhotoRow(){
+    var rec = photos[photoKey(act())];
+    photoRow.hidden = !rec;
+    if(thumbUrl){ URL.revokeObjectURL(thumbUrl); thumbUrl = null; }
+    if(rec){ thumbUrl = URL.createObjectURL(rec.blob); photoThumb.src = thumbUrl; }
+  }
+  document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); photoIn.value = ""; photoIn.click(); });
+  twoTap(document.getElementById("photoDel"), "Delete", "Sure?", function(){
+    var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
+    updateSend(); renderPhotoRow();
+  });
+  twoTap(document.getElementById("newEvent"), "Start over: clear ticks & photos", "Tap again to clear ticks & photos", function(){
     ev = {day: today(), ticks: {}}; save(); hideNext(); dbClear(); refresh();
   });
   twoTap(document.getElementById("resetAll"), "Reset all to default", "Tap again to reset everything", function(){
