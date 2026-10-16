@@ -908,20 +908,23 @@ footer{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space
     for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && !isDone(c)) return c; }
     return null;
   }
-  var nextTarget = null;
+  var nextTarget = null, nextTimer = null, nbClose = document.getElementById("nbClose");
   function showNext(a){
     nextTarget = nextAfter(a);
     nbTitle.textContent = "✓ " + key(a) + " ready";
     nbSub.textContent = nextTarget ? "Photograph the clock now, then go to the next camera." : "Photograph the clock now. That's every camera done.";
-    nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : "All done ✓";
+    nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : "OK";
+    nbClose.hidden = !nextTarget;            // last camera: just an OK button
     nextBar.hidden = false;
+    // Sits for 7 seconds, then gets out of the way of the clock
+    clearTimeout(nextTimer); nextTimer = setTimeout(hideNext, 7000);
   }
-  function hideNext(){ nextBar.hidden = true; }
+  function hideNext(){ clearTimeout(nextTimer); nextBar.hidden = true; }
   nbNext.addEventListener("click", function(){
     hideNext();
     if(nextTarget){ setActive(key(nextTarget)); openSheet(); }
   });
-  document.getElementById("nbClose").addEventListener("click", hideNext);
+  nbClose.addEventListener("click", hideNext);
 
   function openSheet(){ hideNext(); sheet.hidden = false; document.getElementById("sheetClose").focus(); }
   function closeSheet(){ sheet.hidden = true; var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
