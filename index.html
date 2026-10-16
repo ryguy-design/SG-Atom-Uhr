@@ -203,7 +203,20 @@ html.narrow .nb-next{font-size:.92rem; padding:.5rem .7rem}
 .view-scroll.zoom img{max-width:none; max-height:none; width:auto; height:auto; cursor:zoom-out}
 .view-bar{display:flex; align-items:center; gap:.6rem; background:#12301b; border-top:2px solid var(--ok);
   padding-block:.7rem max(.7rem, env(safe-area-inset-bottom,0px)); padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
-.view-hint{flex:1; min-width:0; font-size:.8rem; color:#cfe9d6; text-align:left}
+.view-bar{flex-wrap:wrap; justify-content:flex-end}
+.view-bar .nb-btn.bad{border-color:#7a3a3b; color:#f3b5b6}
+.view-top{display:flex; flex-direction:column; gap:.2rem; text-align:left; background:#151b1f; color:var(--fg);
+  padding-block:max(.8rem, env(safe-area-inset-top,0px)) .7rem; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.view-top b{font-size:1.05rem}
+.view-top span{font-size:.88rem; color:#c9d1d5; line-height:1.35}
+.view-top span b{font-size:inherit; color:var(--fg)}
+.send-list{flex:1; min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(9rem, 1fr)); gap:.7rem; padding:1rem; align-content:start}
+.send-item{display:flex; flex-direction:column; gap:.3rem; background:#1d252a; border-radius:10px; padding:.5rem; text-align:left; font:inherit; color:var(--fg); border:0; cursor:zoom-in}
+.send-item img{width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:6px}
+.send-item b{font-size:.9rem}
+.send-item span{font-size:.8rem; color:var(--ok)}
+.send-item span.bad{color:#f3b5b6}
+.send-item span.miss{color:var(--muted)}
 .photorow span{flex:1; min-width:0; font-weight:700; color:var(--ok); font-size:.9rem}
 .addbtn.del{border-color:var(--bad); color:var(--bad)}
 .addbtn.del.armed{background:var(--bad); color:#fff}
@@ -303,13 +316,18 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   </div>
 </div>
 
-<div id="viewer" class="viewer" hidden role="dialog" aria-modal="true" aria-label="Camera-back photo">
+<!-- Step 2: review the camera-back photo and confirm the camera is in sync -->
+<div id="viewer" class="viewer" hidden role="dialog" aria-modal="true" aria-labelledby="vTitle">
+  <div class="view-top"><b id="vTitle"></b><span id="vSub"></span></div>
   <div id="viewScroll" class="view-scroll"><img id="viewImg" alt="Camera-back photo"></div>
-  <div class="view-bar">
-    <span class="view-hint">Tap photo to zoom</span>
-    <button id="viewRetake" class="nb-btn" type="button">📷 Retake</button>
-    <button id="viewClose" class="nb-next" type="button">Close</button>
-  </div>
+  <div class="view-bar" id="vBar"></div>
+</div>
+
+<!-- Step 3: everything that will be sent, with a last look before the share sheet -->
+<div id="sendView" class="viewer" hidden role="dialog" aria-modal="true" aria-labelledby="sTitle">
+  <div class="view-top"><b id="sTitle"></b><span id="sSub">Tap a photo to look again.</span></div>
+  <div id="sList" class="send-list"></div>
+  <div class="view-bar"><button id="sBack" class="nb-btn" type="button">↩ Back</button><button id="sGo" class="nb-next" type="button"></button></div>
 </div>
 
 <div id="nextBar" class="nextbar" hidden role="status">
@@ -1006,7 +1024,9 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   // ---- Next-camera prompt ----
   function nextAfter(a){
     var i = kit.cams.indexOf(a);
-    for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && !isDone(c)) return c; }
+    // Next camera still needing something: its checks, or (once photos are in use) its camera-back photo
+    var usingPhotos = photoCount() > 0;
+    for(var j = 1; j <= kit.cams.length; j++){ var c = kit.cams[(i + j) % kit.cams.length]; if(c !== a && (!isDone(c) || (usingPhotos && !photos[photoKey(c)]))) return c; }
     return null;
   }
   var nextTarget = null, nextTimer = null, bannerCam = null, bannerWasUp = false;
@@ -1015,8 +1035,9 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     nextTarget = nextAfter(a); bannerCam = a;
     var got = !!photos[photoKey(a)], n = photoCount();
     nbTitle.textContent = "✓ " + key(a) + " ready";
+    var rec = photos[photoKey(a)];
     nbSub.textContent = !got ? "Shoot the clock, then 📷 the camera's screen." :
-      nextTarget ? "Back-of-camera photo saved." : "Every camera done. Send the photos to the group.";
+      (rec.sync === false ? "Photo saved, camera NOT in sync. " : "Photo saved, in sync ✓. ") + (nextTarget ? "" : "Every camera done: send them.");
     nbPhoto.setAttribute("aria-label", got ? "Retake photo of the camera back" : "Photo of the camera back");
     nbPhoto.classList.toggle("done", got);
     nbNext.textContent = nextTarget ? "Next: " + key(nextTarget) + " →" : n ? "Send " + n + " photo" + (n > 1 ? "s" : "") : "OK";
@@ -1027,7 +1048,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   function hideNext(){ clearTimeout(nextTimer); nextBar.hidden = true; }
   nbNext.addEventListener("click", function(){
     hideNext();
-    if(nextTarget){ setActive(key(nextTarget)); openSheet(); }
+    if(nextTarget){ var t = nextTarget; setActive(key(t)); if(isDone(t)) showNext(t); else openSheet(); }
     else if(photoCount()) sendAll();
   });
   // Tap anywhere outside the banner to hide it sooner
@@ -1069,50 +1090,143 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     sendBtn.hidden = !n; sendBtn.textContent = "📷 Send " + n + " camera photo" + (n > 1 ? "s" : "");
   }
   nbPhoto.addEventListener("click", function(){ photoIn.value = ""; photoIn.click(); });
+  // ---- Step 1: take the photo. The app shrinks it and adds a strip: who, which camera, atomic time ----
+  var pending = null;   // a photo just taken, waiting for review
+  function p2(n){ return (n < 10 ? "0" : "") + n; }
+  function stamp(c, t, sync){
+    return [camInit.value, key(c), findCam(c.b, c.m) ? (c.m === OTHER ? "Other " + c.b : c.b + " " + shortName(c.m)) : "", "✓ " + countOf(c) + "/4",
+      p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + "  " + p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) + (synced ? " atomic" : " phone clock, not synced"),
+      sync === true ? "IN SYNC ✓" : sync === false ? "NOT IN SYNC ✗" : ""].filter(Boolean).join("  ·  ");
+  }
+  function compose(base, label, sync){
+    var w = base.width, h = base.height, bar = Math.round(Math.max(w, h) * 0.06);
+    var cv = document.createElement("canvas"); cv.width = w; cv.height = h + bar;
+    var g = cv.getContext("2d"); g.drawImage(base, 0, 0);
+    g.fillStyle = sync === false ? "#5a1214" : sync === true ? "#0d3a1c" : "#000"; g.fillRect(0, h, w, bar);
+    var font = function(px){ return "700 " + px + "px system-ui, -apple-system, Roboto, sans-serif"; };
+    var fs = Math.round(bar * 0.48); g.font = font(fs);
+    while(g.measureText(label).width > w * 0.95 && fs > 8){ fs--; g.font = font(fs); }
+    g.fillStyle = "#fff"; g.textBaseline = "middle"; g.fillText(label, Math.round(bar * 0.35), h + bar / 2);
+    return cv;
+  }
   photoIn.addEventListener("change", function(){
     var f = photoIn.files && photoIn.files[0], c = bannerCam || act(); if(!f || !c) return;
     var url = URL.createObjectURL(f), img = new Image();
     img.onload = function(){
-      // Scale to a chat-friendly size and add a strip saying which camera it is
       var max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
-      var w = Math.round(img.width * k), h = Math.round(img.height * k), bar = Math.round(Math.max(w, h) * 0.06);
-      var cv = document.createElement("canvas"); cv.width = w; cv.height = h + bar;
-      var g = cv.getContext("2d"); g.drawImage(img, 0, 0, w, h);
-      g.fillStyle = "#000"; g.fillRect(0, h, w, bar);
-      // When the phone photo was taken, on atomic time: the file's own timestamp (phone clock)
-      // corrected by the atomic offset; if that stamp looks wrong, the moment it came back to the app
-      var lm = f.lastModified, ref = (lm && Math.abs(Date.now() - lm) < 10*60*1000) ? lm : Date.now();
-      var t = new Date(ref + offset), p2 = function(n){ return (n < 10 ? "0" : "") + n; };
-      var label = [camInit.value, key(c), findCam(c.b, c.m) ? (c.m === OTHER ? "Other " + c.b : c.b + " " + shortName(c.m)) : "", "✓ " + countOf(c) + "/4",
-        p2(t.getDate()) + "." + p2(t.getMonth()+1) + "." + t.getFullYear() + "  " + p2(t.getHours()) + ":" + p2(t.getMinutes()) + ":" + p2(t.getSeconds()) +
-        (synced ? " atomic" : " phone clock, not synced")].filter(Boolean).join("  ·  ");
-      var fs = Math.round(bar * 0.48); g.font = "700 " + fs + "px system-ui, -apple-system, Roboto, sans-serif";
-      while(g.measureText(label).width > w * 0.95 && fs > 8){ fs--; g.font = "700 " + fs + "px system-ui, -apple-system, Roboto, sans-serif"; }
-      g.fillStyle = "#fff"; g.textBaseline = "middle"; g.fillText(label, Math.round(bar * 0.35), h + bar / 2);
+      var base = document.createElement("canvas"); base.width = Math.round(img.width * k); base.height = Math.round(img.height * k);
+      base.getContext("2d").drawImage(img, 0, 0, base.width, base.height);
       URL.revokeObjectURL(url);
-      cv.toBlob(function(b){
-        if(!b) return;
-        var name = ((camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg");
-        var rec = {day: ev.day, name: name, blob: b, cam: key(c)};
-        photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); updateSend();
-        setActive(key(c)); showNext(c);
-      }, "image/jpeg", 0.85);
+      // When the phone photo was taken, on atomic time: the file's own timestamp corrected by the atomic offset
+      var lm = f.lastModified, ref = (lm && Math.abs(Date.now() - lm) < 10*60*1000) ? lm : Date.now();
+      pending = {c: c, base: base, t: new Date(ref + offset)};
+      setActive(key(c)); hideNext();
+      openReview();
     };
     img.onerror = function(){ URL.revokeObjectURL(url); };
     img.src = url;
   });
+
+  // ---- Step 2: review. Zoom in and confirm the camera's time matches the clock, to the second ----
+  var viewer = document.getElementById("viewer"), viewScroll = document.getElementById("viewScroll"), viewImg = document.getElementById("viewImg");
+  var vTitle = document.getElementById("vTitle"), vSub = document.getElementById("vSub"), vBar = document.getElementById("vBar");
+  var viewUrl = null, viewFrom = null;   // viewFrom: "review" (new photo), "saved" (from thumbnail), "send" (from the send list)
+  function showImg(src){ if(viewUrl){ URL.revokeObjectURL(viewUrl); viewUrl = null; } viewImg.src = src; viewScroll.classList.remove("zoom"); viewScroll.scrollTop = 0; }
+  function bar(btns){
+    vBar.textContent = "";
+    btns.forEach(function(b){ var el = document.createElement("button"); el.type = "button"; el.className = b[2] || "nb-btn"; el.textContent = b[0]; el.addEventListener("click", b[1]); vBar.appendChild(el); });
+    var last = vBar.lastChild; if(last) last.focus();
+  }
+  var CHECK = "Zoom in on the camera's screen: the <b>clock in its photo</b> and the <b>camera's own time</b> should show the same second.";
+  function openReview(){
+    var c = pending.c; viewFrom = "review";
+    vTitle.textContent = "📷 " + key(c) + ": is the camera in sync?";
+    vSub.innerHTML = CHECK + " Tap the photo to zoom.";
+    showImg(compose(pending.base, stamp(c, pending.t)).toDataURL("image/jpeg", .85));
+    viewer.hidden = false;
+    bar([["✕ Discard", function(){ pending = null; closeViewer(); showNext(c); }],
+         ["📷 Retake", retake],
+         ["✗ Not in sync", notInSync, "nb-btn bad"],
+         ["✓ In sync", function(){ keep(true); }, "nb-next"]]);
+  }
+  function notInSync(){
+    var c = pending.c;
+    vTitle.textContent = "✗ " + key(c) + " not in sync";
+    vSub.innerHTML = "Set the camera's clock (phone app like SnapBridge, or the camera's date/time menu), shoot the clock again, then <b>retake</b> this photo.";
+    bar([["↩ Back", openReview], ["Keep anyway", function(){ keep(false); }, "nb-btn bad"], ["📷 Retake", retake, "nb-next"]]);
+  }
+  function retake(){ var c = pending ? pending.c : act(); closeViewer(); bannerCam = c; photoIn.value = ""; photoIn.click(); }
+  function keep(sync){
+    var c = pending.c, t = pending.t;
+    compose(pending.base, stamp(c, t, sync), sync).toBlob(function(b){
+      if(!b) return;
+      var name = (camInit.value ? camInit.value + "_" : "") + short(c) + "_" + p2(t.getHours()) + p2(t.getMinutes()) + p2(t.getSeconds()) + ".jpg";
+      var rec = {day: ev.day, name: name, blob: b, cam: key(c), sync: sync};
+      photos[photoKey(c)] = rec; dbPut(photoKey(c), rec); pending = null;
+      updateSend(); closeViewer(); setActive(key(c)); showNext(c);
+    }, "image/jpeg", 0.85);
+  }
+  function closeViewer(){ viewer.hidden = true; viewScroll.classList.remove("zoom"); if(viewUrl){ URL.revokeObjectURL(viewUrl); viewUrl = null; } }
+  // A saved photo, from the thumbnail in the check or from the send list
+  function viewSaved(c, from){
+    var rec = photos[photoKey(c)]; if(!rec) return;
+    viewFrom = from;
+    vTitle.textContent = "📷 " + key(c) + (rec.sync === true ? " · in sync ✓" : rec.sync === false ? " · not in sync ✗" : "");
+    vSub.innerHTML = CHECK;
+    showImg(""); viewUrl = URL.createObjectURL(rec.blob); viewImg.src = viewUrl;
+    viewer.hidden = false;
+    bar([["📷 Retake", function(){ closeViewer(); sendView.hidden = true; bannerCam = c; setActive(key(c)); photoIn.value = ""; photoIn.click(); }],
+         [from === "send" ? "↩ Back to list" : "Close", closeViewer, "nb-next"]]);
+  }
+  document.getElementById("photoThumb").addEventListener("click", function(){ viewSaved(act(), "saved"); });
+  viewImg.addEventListener("click", function(e){
+    // Toggle full size, centred on where you tapped
+    var rx = e.offsetX / viewImg.clientWidth || .5, ry = e.offsetY / viewImg.clientHeight || .5;
+    if(viewScroll.classList.toggle("zoom")) requestAnimationFrame(function(){
+      viewScroll.scrollLeft = viewImg.naturalWidth * rx - viewScroll.clientWidth / 2;
+      viewScroll.scrollTop = viewImg.naturalHeight * ry - viewScroll.clientHeight / 2;
+    });
+  });
+
+  // ---- Step 3: send. A last look at every camera, then the phone's share sheet ----
+  var sendView = document.getElementById("sendView"), sList = document.getElementById("sList"), sGo = document.getElementById("sGo"), listUrls = [];
   function sendAll(){
+    hideNext();
+    listUrls.forEach(function(u){ URL.revokeObjectURL(u); }); listUrls = []; sList.textContent = "";
+    var n = 0, bad = 0, miss = 0;
+    kit.cams.forEach(function(c){
+      var rec = photos[photoKey(c)], it = document.createElement("button"); it.type = "button"; it.className = "send-item";
+      var st = document.createElement("span");
+      if(rec){
+        n++; var u = URL.createObjectURL(rec.blob); listUrls.push(u);
+        var im = document.createElement("img"); im.src = u; im.alt = ""; it.appendChild(im);
+        st.textContent = rec.sync === true ? "In sync ✓" : rec.sync === false ? "Not in sync ✗" : "Not checked"; if(rec.sync !== true){ st.className = "bad"; bad++; }
+        it.addEventListener("click", function(){ viewSaved(c, "send"); });
+      } else {
+        miss++; st.textContent = "No photo"; st.className = "miss"; it.style.cursor = "default";
+      }
+      var nm = document.createElement("b"); nm.textContent = key(c); it.appendChild(nm); it.appendChild(st);
+      sList.appendChild(it);
+    });
+    document.getElementById("sTitle").textContent = "Send " + n + " camera photo" + (n === 1 ? "" : "s") + "?";
+    document.getElementById("sSub").textContent = "Tap a photo to look again." + (bad ? " " + bad + " not confirmed in sync." : "") + (miss ? " " + miss + " camera" + (miss > 1 ? "s have" : " has") + " no photo." : "");
+    sGo.textContent = "Send " + n + " →"; sGo.disabled = !n;
+    sendView.hidden = false; sGo.focus();
+  }
+  document.getElementById("sBack").addEventListener("click", function(){ sendView.hidden = true; });
+  sGo.addEventListener("click", function(){
     var list = kit.cams.map(function(c){ return photos[photoKey(c)]; }).filter(Boolean);
     if(!list.length) return;
     var files = list.map(function(x){ return new File([x.blob], x.name, {type: "image/jpeg"}); });
     var text = (camInit.value ? camInit.value + " · " : "") + "camera check " + ev.day.split("-").reverse().join(".");
     if(navigator.canShare && navigator.canShare({files: files})){
-      navigator.share({files: files, text: text}).catch(function(){});
+      navigator.share({files: files, text: text}).then(function(){ sendView.hidden = true; }).catch(function(){});
     } else {
       // No share sheet (e.g. desktop): download them instead
       files.forEach(function(f){ var a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); });
+      sendView.hidden = true;
     }
-  }
+  });
   sendBtn.addEventListener("click", sendAll);
 
   function openSheet(){ hideNext(); sheet.hidden = false; if(rotated) fit(); document.getElementById("sheetClose").focus(); }
@@ -1157,29 +1271,11 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     if(rec){ thumbUrl = URL.createObjectURL(rec.blob); photoThumb.src = thumbUrl; }
   }
   document.getElementById("photoRetake").addEventListener("click", function(){ bannerCam = act(); photoIn.value = ""; photoIn.click(); });
-  // Tap the thumbnail to check the photo full screen (is the camera's time readable?)
-  var viewer = document.getElementById("viewer"), viewScroll = document.getElementById("viewScroll"), viewImg = document.getElementById("viewImg");
-  function openViewer(){
-    if(!thumbUrl) return;
-    viewImg.src = thumbUrl; viewScroll.classList.remove("zoom"); viewer.hidden = false;
-    document.getElementById("viewClose").focus();
-  }
-  function closeViewer(){ viewer.hidden = true; viewScroll.classList.remove("zoom"); }
-  photoThumb.addEventListener("click", openViewer);
-  viewImg.addEventListener("click", function(e){
-    // Toggle full size, centred on where you tapped
-    var zoomed = viewScroll.classList.toggle("zoom");
-    if(zoomed){
-      var rx = e.offsetX / viewImg.clientWidth || .5, ry = e.offsetY / viewImg.clientHeight || .5;
-      requestAnimationFrame(function(){
-        viewScroll.scrollLeft = viewImg.naturalWidth * rx - viewScroll.clientWidth / 2;
-        viewScroll.scrollTop = viewImg.naturalHeight * ry - viewScroll.clientHeight / 2;
-      });
-    }
-  });
-  document.getElementById("viewClose").addEventListener("click", closeViewer);
-  document.getElementById("viewRetake").addEventListener("click", function(){ closeViewer(); bannerCam = act(); photoIn.value = ""; photoIn.click(); });
-  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && !viewer.hidden){ e.stopPropagation(); closeViewer(); } }, true);
+  document.addEventListener("keydown", function(e){
+    if(e.key !== "Escape") return;
+    if(!viewer.hidden){ e.stopPropagation(); if(viewFrom === "review"){ pending = null; } closeViewer(); }
+    else if(!sendView.hidden){ e.stopPropagation(); sendView.hidden = true; }
+  }, true);
   twoTap(document.getElementById("photoDel"), "Delete", "Sure?", function(){
     var k = photoKey(act()); delete photos[k]; db(function(d){ try{ d.transaction("p","readwrite").objectStore("p").delete(k); }catch(e){} });
     updateSend(); renderPhotoRow();
