@@ -304,7 +304,38 @@ html.narrow #status{align-items:center}
 /* Rotate button: turns the whole app 90°, works even with the phone's rotation lock on */
 html.rot{overflow:hidden}
 html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); transform-origin:0 0; transform:translateX(var(--rh)) rotate(90deg)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* ---- Motion: soft, slightly springy ("liquid") ---- */
+:root{--spring:cubic-bezier(.2,1.25,.3,1); --ease:cubic-bezier(.2,.8,.2,1)}
+/* Bottom panel: slides up, can be dragged down to a small peek, and back up */
+.nextbar{transition:transform .5s var(--spring); will-change:transform; border-radius:18px 18px 0 0; padding-top:.35rem; touch-action:pan-x}
+.nextbar:not([hidden]){animation:panelIn .55s var(--spring)}
+.nextbar.leaving{transform:translateY(110%)!important; transition:transform .28s var(--ease)}
+.nextbar.dragging{transition:none}
+.nextbar.mini{transform:translateY(calc(100% - var(--peek,3.6rem)))}
+.fl-grab{align-self:center; display:flex; align-items:center; justify-content:center; width:100%; height:1.3rem; margin-bottom:-.15rem; padding:0; background:none; border:0; cursor:grab; touch-action:none}
+.fl-grab i{display:block; width:2.6rem; height:5px; border-radius:3px; background:#56626a}
+.fl-grab:active{cursor:grabbing}
+.fl-grab:focus-visible{outline:2px solid var(--fg); outline-offset:2px; border-radius:6px}
+.nextbar .fl-body{transition:opacity .3s var(--ease)}
+.nextbar.swap > :not(.fl-grab){animation:swapIn .38s var(--ease)}
+@keyframes panelIn{from{transform:translateY(105%)} to{transform:translateY(0)}}
+@keyframes swapIn{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+/* Camera check sheet: backdrop fades, panel rises with a little spring */
+.sheet:not([hidden]){animation:fadeIn .25s var(--ease)}
+.sheet:not([hidden]) .sheet-panel{animation:riseIn .5s var(--spring)}
+.sheet.leaving{animation:fadeOut .22s var(--ease) forwards}
+.sheet.leaving .sheet-panel{animation:sinkOut .24s var(--ease) forwards}
+@keyframes fadeIn{from{opacity:0}} @keyframes fadeOut{to{opacity:0}}
+@keyframes riseIn{from{transform:translateY(60%); opacity:.4}} @keyframes sinkOut{to{transform:translateY(70%); opacity:0}}
+/* Full screens (camera, review, send list): grow in softly */
+.viewer:not([hidden]){animation:screenIn .42s var(--spring)}
+@keyframes screenIn{from{opacity:0; transform:scale(.96) translateY(14px); border-radius:24px}}
+/* Camera buttons and the clock label react to touch */
+.chip,.fl-go,.fl-add,.fl-x,.resetbtn,.cam-shut{transition:transform .25s var(--spring), background-color .2s, border-color .2s, color .2s}
+.chip:active,.fl-go:active,.fl-add:active,.fl-x:active,.resetbtn:active{transform:scale(.95)}
+.camwrap,.camset,.cammodel{transition:opacity .3s var(--ease)}
+footer,.taphint{transition:opacity .3s var(--ease)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
 </style>
 </head>
 <body>
@@ -423,6 +454,7 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
 </div>
 
 <div id="nextBar" class="nextbar" hidden role="region" aria-label="Camera steps">
+  <button id="flGrab" class="fl-grab" type="button" aria-label="Slide the panel down or up"><i></i></button>
   <div class="fl-top"><div id="flCams" class="fl-cams" aria-label="Cameras"></div>
     <button id="flPlus" class="fl-x plus" type="button" aria-label="Add a camera" title="Add camera">+</button>
     <button id="flEdit" class="fl-x" type="button" aria-label="Edit this camera" title="Edit camera">✎</button>
@@ -1216,12 +1248,41 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
     disarmDel(); flAdd = false; renderFlCams();
     flL.textContent = o.l ? o.l[0] : ""; act_l = o.l ? o.l[1] : null; flL.className = "fl-link" + (o.l && o.l[2] ? " " + o.l[2] : "");
     flR.textContent = o.r ? o.r[0] : ""; act_r = o.r ? o.r[1] : null; flR.className = "fl-link" + (o.r && o.r[2] ? " " + o.r[2] : "");
-    nextBar.hidden = false;
+    clearTimeout(hideT); nextBar.classList.remove("leaving", "mini"); nextBar.style.transform = "";
+    var wasUp = !nextBar.hidden; nextBar.hidden = false;
+    if(wasUp){ nextBar.classList.remove("swap"); void nextBar.offsetWidth; nextBar.classList.add("swap"); }   // new step: content glides in
   }
   flGo.addEventListener("click", function(){ if(act_go) act_go(); });
   flL.addEventListener("click", function(){ if(act_l) act_l(); });
   flR.addEventListener("click", function(){ if(act_r) act_r(); });
   document.getElementById("flX").addEventListener("click", hideNext);
+  // Slide the panel: drag the little line down to tuck it away (a strip stays), drag or tap it to bring it back
+  (function(){
+    var grab = document.getElementById("flGrab"), y0 = 0, t0 = 0, base = 0, h = 0, dy = 0, moved = false, down = false;
+    // Tucked-away strip keeps the line and the camera row (with ✕) visible
+    function peekPx(){ return grab.offsetHeight + document.querySelector(".fl-top").offsetHeight + 14; }
+    function setMini(on){ nextBar.style.setProperty("--peek", peekPx() + "px"); nextBar.classList.toggle("mini", on); nextBar.style.transform = ""; }
+    grab.addEventListener("pointerdown", function(e){
+      down = true; moved = false; y0 = e.clientY; t0 = Date.now(); h = nextBar.offsetHeight;
+      base = nextBar.classList.contains("mini") ? h - peekPx() : 0;
+      nextBar.classList.add("dragging"); grab.setPointerCapture(e.pointerId);
+    });
+    grab.addEventListener("pointermove", function(e){
+      if(!down) return; dy = e.clientY - y0; if(Math.abs(dy) > 4) moved = true;
+      var y = base + dy; if(y < 0) y = y * 0.25;               // a little stretch past the top, like pulling something soft
+      if(y > h - peekPx()) y = (h - peekPx()) + (y - (h - peekPx())) * 0.25;
+      nextBar.style.transform = "translateY(" + y + "px)";
+    });
+    function end(){
+      if(!down) return; down = false; nextBar.classList.remove("dragging");
+      if(!moved){ setMini(!nextBar.classList.contains("mini")); return; }   // a tap toggles
+      var v = dy / Math.max(1, Date.now() - t0), y = base + dy;
+      setMini(v > 0.5 || (v > -0.5 && y > (h - peekPx()) / 2));
+    }
+    grab.addEventListener("pointerup", end); grab.addEventListener("pointercancel", end);
+    // Tucked away: tapping the strip brings the panel back
+    nextBar.addEventListener("click", function(e){ if(nextBar.classList.contains("mini") && !grab.contains(e.target) && !e.target.closest(".fl-x")){ e.stopPropagation(); setMini(false); } }, true);
+  })();
   document.getElementById("flEdit").addEventListener("click", function(){ var c = bannerCam || act(); hideNext(); setActive(key(c)); openSheet(); });
   // Delete from the panel: first tap asks, second deletes
   var flDel = document.getElementById("flDel"), delT = null;
@@ -1257,7 +1318,13 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   document.getElementById("flAddLS").addEventListener("click", function(){ hideNext(); addFirst("LS"); });
   document.getElementById("flPlus").addEventListener("click", function(){ flAdd = true; renderFlCams(); });
   flThumb.addEventListener("click", function(){ if(bannerCam) viewSaved(bannerCam, "saved"); });
-  function hideNext(){ nextBar.hidden = true; }
+  // Slide the panel away (then hide it)
+  var hideT = null;
+  function hideNext(){
+    if(nextBar.hidden) return;
+    nextBar.classList.add("leaving"); clearTimeout(hideT);
+    hideT = setTimeout(function(){ nextBar.hidden = true; nextBar.classList.remove("leaving", "mini"); nextBar.style.transform = ""; }, 280);
+  }
   function doneCount(){ var n = 0; kit.cams.forEach(function(c){ if(isDone(c) && (photos[photoKey(c)] || skipped[photoKey(c)])) n++; }); return n; }
   function goNext(){
     var t = nextTarget; if(!t) return;
@@ -1618,8 +1685,12 @@ html.rot body{position:fixed; top:0; left:0; width:var(--rw); height:var(--rh); 
   });
   sendBtn.addEventListener("click", sendAll);
 
-  function openSheet(){ hideNext(); sheet.hidden = false; if(rotated) fit(); document.getElementById("sheetClose").focus(); }
-  function closeSheet(){ sheet.hidden = true; if(rotated) fit(); var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
+  function openSheet(){ hideNext(); clearTimeout(sheetT); sheet.classList.remove("leaving"); sheet.hidden = false; if(rotated) fit(); document.getElementById("sheetClose").focus(); }
+  var sheetT = null;
+  function closeSheet(){
+    if(sheet.hidden) return;
+    sheet.classList.add("leaving"); clearTimeout(sheetT);
+    sheetT = setTimeout(function(){ sheet.hidden = true; sheet.classList.remove("leaving"); if(rotated) fit(); }, 230); var a = stripEl.querySelector(".chip.act"); if(a) a.focus(); }
   // All 4 ticked: a big Continue button in the check takes you back into the steps (no need to untick and re-tick)
   var sheetGo = document.getElementById("sheetGo");
   function updateSheetGo(){
