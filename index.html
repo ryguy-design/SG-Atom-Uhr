@@ -1259,16 +1259,18 @@ footer,.taphint{transition:opacity .3s var(--ease)}
   // Slide the panel: drag the little line down to tuck it away (a strip stays), drag or tap it to bring it back
   (function(){
     var grab = document.getElementById("flGrab"), y0 = 0, t0 = 0, base = 0, h = 0, dy = 0, moved = false, down = false;
+    // When the app is turned with the rotate button, the panel's "down" is sideways on the glass
+    function along(e){ return document.documentElement.classList.contains("rot") ? -e.clientX : e.clientY; }
     // Tucked-away strip keeps the line and the camera row (with ✕) visible
     function peekPx(){ return grab.offsetHeight + document.querySelector(".fl-top").offsetHeight + 14; }
     function setMini(on){ nextBar.style.setProperty("--peek", peekPx() + "px"); nextBar.classList.toggle("mini", on); nextBar.style.transform = ""; }
     grab.addEventListener("pointerdown", function(e){
-      down = true; moved = false; y0 = e.clientY; t0 = Date.now(); h = nextBar.offsetHeight;
+      down = true; moved = false; dy = 0; y0 = along(e); t0 = Date.now(); h = nextBar.offsetHeight;
       base = nextBar.classList.contains("mini") ? h - peekPx() : 0;
       nextBar.classList.add("dragging"); grab.setPointerCapture(e.pointerId);
     });
     grab.addEventListener("pointermove", function(e){
-      if(!down) return; dy = e.clientY - y0; if(Math.abs(dy) > 4) moved = true;
+      if(!down) return; dy = along(e) - y0; if(Math.abs(dy) > 4) moved = true;
       var y = base + dy; if(y < 0) y = y * 0.25;               // a little stretch past the top, like pulling something soft
       if(y > h - peekPx()) y = (h - peekPx()) + (y - (h - peekPx())) * 0.25;
       nextBar.style.transform = "translateY(" + y + "px)";
